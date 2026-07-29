@@ -1,0 +1,1736 @@
+{
+    "npcs": [
+        {
+            "name": "TestNPC",
+            "asset": "TestNPC"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Handgun"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher"
+        },
+        {
+            "name": "Syndicate Interceptor",
+            "asset": "Hunter_MissileLauncher"
+        },
+        {
+            "name": "Syndicate Veteran",
+            "asset": "Hunter_GrenadeLauncher"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Bat"
+        },
+        {
+            "name": "Syndicate Grenadier",
+            "asset": "Hunter_Grenade"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Hunter_FlameThrower"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Rifle"
+        },
+        {
+            "name": "PIDF Guard",
+            "asset": "Police_Handgun"
+        },
+        {
+            "name": "PIDF Elite",
+            "asset": "Police_Shotgun"
+        },
+        {
+            "name": "Islander",
+            "asset": "MobuCitizen"
+        },
+        {
+            "name": "Villager",
+            "asset": "MobuVillager"
+        },
+        {
+            "name": "Quest Client",
+            "asset": "QuestMan"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson"
+        },
+        {
+            "name": "Visitor",
+            "asset": "VisitingMerchant"
+        },
+        {
+            "name": "Weapons Dealer",
+            "asset": "WeaponsDealer"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "PalDealer"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "Inspector"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "PalTrader"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "GoodwillAmbassador"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "Robbery_Leader"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "Robbery_Minion"
+        },
+        {
+            "name": "Guard",
+            "asset": "Guard_Rifle"
+        },
+        {
+            "name": "Guard",
+            "asset": "Guard_Shotgun"
+        },
+        {
+            "name": "TestAssassin",
+            "asset": "TestAssassin"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Visitor_Hunter_Rifle"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "Visitor_Present"
+        },
+        {
+            "name": "Attack Chopper",
+            "asset": "SecurityDrone"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_Rifle"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_FlameThrower"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_Bat"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_CrossBow"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_People02"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_People03"
+        },
+        {
+            "name": "Villager",
+            "asset": "Female_People02"
+        },
+        {
+            "name": "Villager",
+            "asset": "Female_People03"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_Trader01"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_Trader02"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_Trader03"
+        },
+        {
+            "name": "Black Marketeer",
+            "asset": "Male_DarkTrader01"
+        },
+        {
+            "name": "Black Marketeer",
+            "asset": "Male_DarkTrader01_02"
+        },
+        {
+            "name": "Black Marketeer",
+            "asset": "Male_DarkTrader01_03"
+        },
+        {
+            "name": "Black Marketeer",
+            "asset": "Male_DarkTrader01_04"
+        },
+        {
+            "name": "Villager",
+            "asset": "Male_DesertPeople01"
+        },
+        {
+            "name": "Villager",
+            "asset": "Female_DesertPeople02"
+        },
+        {
+            "name": "Islander",
+            "asset": "MobuCitizen_Male"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Soldier01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Soldier01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Police_old"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Male_Scientist01_LaserRifle"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Scientist_FlameThrower"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson_Desert"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson_Desert2"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "PalDealer_Desert"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson_Volcano"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson_Volcano2"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "PalDealer_Volcano"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "SalesPerson_Wander"
+        },
+        {
+            "name": "Pal Merchant",
+            "asset": "RandomEventShop"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle_Invader"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Handgun_Invader"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun_Invader"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_Invader"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Bat_Invader"
+        },
+        {
+            "name": "Syndicate Grenadier",
+            "asset": "Hunter_Grenade_Invader"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Hunter_FlameThrower_Invader"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun_Invader"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_Bat_Invader"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_CrossBow_Invader"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_Rifle_Invader"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_FlameThrower_Invader"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Male_Scientist01_LaserRifle_Invader"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Scientist_FlameThrower_Invader"
+        },
+        {
+            "name": "Free Pal Alliance Judicator",
+            "asset": "Believer_Fat_GatlingGun"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Soldier02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Soldier02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Soldier03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Soldier03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Soldier04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Soldier04"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle_Oilrig"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun_Oilrig"
+        },
+        {
+            "name": "Syndicate Grenadier",
+            "asset": "Hunter_Grenade_Oilrig"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Hunter_FlameThrower_Oilrig"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_Oilrig"
+        },
+        {
+            "name": "Syndicate Veteran",
+            "asset": "Hunter_GrenadeLauncher_Oilrig"
+        },
+        {
+            "name": "Syndicate Interceptor",
+            "asset": "Hunter_MissileLauncher_Oilrig"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun_Oilrig"
+        },
+        {
+            "name": "Medal Merchant",
+            "asset": "Male_DarkTrader02"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Male_Ninja01"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "Male_NinjaElite01"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun_Tower"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle_Tower"
+        },
+        {
+            "name": "Free Pal Alliance Judicator",
+            "asset": "Believer_Fat_Cane_Tower"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_CrossBow_Tower"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja01_Tower"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "NinjaElite01_Tower"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Rifle_Tower"
+        },
+        {
+            "name": "PIDF Elite",
+            "asset": "Police_Shotgun_Tower"
+        },
+        {
+            "name": "Hawk",
+            "asset": "BOSS_Hunter_Rifle"
+        },
+        {
+            "name": "Grill",
+            "asset": "BOSS_Hunter_Fat_GatlingGun"
+        },
+        {
+            "name": "Ego",
+            "asset": "BOSS_Believer_CrossBow"
+        },
+        {
+            "name": "Brick",
+            "asset": "BOSS_Believer_Fat_GiantClub"
+        },
+        {
+            "name": "Whip",
+            "asset": "BOSS_Police_Rifle"
+        },
+        {
+            "name": "Shadow",
+            "asset": "BOSS_FireCult_FlameThrower"
+        },
+        {
+            "name": "Whisk",
+            "asset": "BOSS_Scientist_LaserRifle"
+        },
+        {
+            "name": "Fumble",
+            "asset": "BOSS_Ninja"
+        },
+        {
+            "name": "Urchin",
+            "asset": "BOSS_Male_NinjaElite"
+        },
+        {
+            "name": "Gnaw",
+            "asset": "BOSS_Viking"
+        },
+        {
+            "name": "Cache",
+            "asset": "BOSS_VikingElite"
+        },
+        {
+            "name": "Jade",
+            "asset": "BOSS_Female_Soldier"
+        },
+        {
+            "name": "Dazzle",
+            "asset": "BOSS_Female_Soldier02"
+        },
+        {
+            "name": "Aloha",
+            "asset": "BOSS_Female_Soldier03"
+        },
+        {
+            "name": "Nimble",
+            "asset": "BOSS_Female_Soldier04"
+        },
+        {
+            "name": "Crash",
+            "asset": "BOSS_Male_Soldier"
+        },
+        {
+            "name": "Dart",
+            "asset": "BOSS_Male_Soldier02"
+        },
+        {
+            "name": "Clint",
+            "asset": "BOSS_Male_Soldier03"
+        },
+        {
+            "name": "Lasso",
+            "asset": "BOSS_Male_Soldier04"
+        },
+        {
+            "name": "Flare",
+            "asset": "BOSS_Female_People"
+        },
+        {
+            "name": "Siren",
+            "asset": "BOSS_Female_People02"
+        },
+        {
+            "name": "Turncoat",
+            "asset": "BOSS_Female_People03"
+        },
+        {
+            "name": "Dyna",
+            "asset": "BOSS_Male_People"
+        },
+        {
+            "name": "Mite",
+            "asset": "BOSS_Male_People2"
+        },
+        {
+            "name": "Quill",
+            "asset": "BOSS_Male_People02"
+        },
+        {
+            "name": "Scoot",
+            "asset": "BOSS_Male_People03"
+        },
+        {
+            "name": "Phantom",
+            "asset": "BOSS_Male_DesertPeople"
+        },
+        {
+            "name": "Whisper",
+            "asset": "BOSS_Female_DesertPeople"
+        },
+        {
+            "name": "Pinch",
+            "asset": "BOSS_Police_old"
+        },
+        {
+            "name": "Ram",
+            "asset": "BOSS_DarkTrader"
+        },
+        {
+            "name": "Skim",
+            "asset": "BOSS_Male_Trader01"
+        },
+        {
+            "name": "Mimic",
+            "asset": "BOSS_Male_Trader02"
+        },
+        {
+            "name": "Billy",
+            "asset": "BOSS_Male_Trader03"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Handgun_MiniOilrig"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle_MiniOilrig"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun_MiniOilrig"
+        },
+        {
+            "name": "Syndicate Grenadier",
+            "asset": "Hunter_Grenade_MiniOilrig"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Hunter_FlameThrower_MiiniOilrig"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_MiniOilrig"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun_MiniOilrig"
+        },
+        {
+            "name": "Sturdy Mercenary",
+            "asset": "Male_Soldier01_EnemyGroup"
+        },
+        {
+            "name": "Sturdy Mercenary",
+            "asset": "Male_Soldier02_EnemyGroup"
+        },
+        {
+            "name": "Syndicate Laser Rifleman",
+            "asset": "Hunter_LaserRifle_Oilrig"
+        },
+        {
+            "name": "Syndicate Crossbowman",
+            "asset": "Hunter_BowGun_Oilrig"
+        },
+        {
+            "name": "Syndicate Swordsman",
+            "asset": "Hunter_Katana_Oilrig"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_Oilrig_LD"
+        },
+        {
+            "name": "Syndicate Gunner",
+            "asset": "Hunter_Rifle_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Grenadier",
+            "asset": "Hunter_Grenade_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Hunter_FlameThrower_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Veteran",
+            "asset": "Hunter_GrenadeLauncher_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Interceptor",
+            "asset": "Hunter_MissileLauncher_LargeOilrig"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_GatlingGun_LargeOilrig"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Viking"
+        },
+        {
+            "name": "Feybreak Berserker",
+            "asset": "Viking_Elite"
+        },
+        {
+            "name": "Pal Recruiter",
+            "asset": "Visitor_Recruiter"
+        },
+        {
+            "name": "Free Pal Alliance Judicator",
+            "asset": "Believer_Fat_Cane"
+        },
+        {
+            "name": "Emote_Tester",
+            "asset": "Emote_Tester"
+        },
+        {
+            "name": "Islander",
+            "asset": "Doctor"
+        },
+        {
+            "name": "Islander",
+            "asset": "PalPassive_Doctor"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Food"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_Paldex"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_BossDefeat"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalCaptureCount"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_A_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_B_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_C_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_D_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_E_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_F_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_G_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_H_01"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalDisplay_I_01"
+        },
+        {
+            "name": "Friendly Pal Tamer",
+            "asset": "Female_Presenter01"
+        },
+        {
+            "name": "Caravan Leader",
+            "asset": "CaravanLeader01"
+        },
+        {
+            "name": "Caravan Leader",
+            "asset": "CaravanLeader02"
+        },
+        {
+            "name": "Caravan Leader",
+            "asset": "CaravanLeader03"
+        },
+        {
+            "name": "Islander",
+            "asset": "NPC_FoodRequire_1"
+        },
+        {
+            "name": "Islander",
+            "asset": "NPC_PalDisplay_1"
+        },
+        {
+            "name": "Guard",
+            "asset": "BountyTrader"
+        },
+        {
+            "name": "Desert Town Ambassador",
+            "asset": "Ambassador01"
+        },
+        {
+            "name": "Blacksmith in Training",
+            "asset": "Blacksmith01"
+        },
+        {
+            "name": "Gourmet Hunter",
+            "asset": "Epicure01"
+        },
+        {
+            "name": "Mercenary Bodyguard",
+            "asset": "Escort_Warrior01"
+        },
+        {
+            "name": "Pal Tamer Bodyguard",
+            "asset": "Escort_PalTamer01"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Viking_Tower"
+        },
+        {
+            "name": "Feybreak Berserker",
+            "asset": "VikingElite_Tower"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "Male_NinjaElite01_Invader"
+        },
+        {
+            "name": "Feybreak Berserker",
+            "asset": "Viking_Elite_Invader"
+        },
+        {
+            "name": "Fiery Pal Tamer",
+            "asset": "Male_Soldier02_Invader"
+        },
+        {
+            "name": "Gemini Tamers",
+            "asset": "Female_Soldier03_Invader"
+        },
+        {
+            "name": "Gemini Tamers",
+            "asset": "Female_Soldier04_Invader"
+        },
+        {
+            "name": "Islander",
+            "asset": "Yamishima_guide1"
+        },
+        {
+            "name": "Islander",
+            "asset": "Yamishima_guide2"
+        },
+        {
+            "name": "Islander",
+            "asset": "Yamishima_guide3"
+        },
+        {
+            "name": "Islander",
+            "asset": "Yamishima_guide4"
+        },
+        {
+            "name": "Mercenary Bodyguard",
+            "asset": "Yamishima_guide5"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_A_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_B_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_C_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_D_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_E_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_F_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_G_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_H_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Reward_Emote_I_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_A_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_A_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_B_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_B_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_C_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_C_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_D_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_D_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_E_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_E_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_F_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_F_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_G_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_G_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_H_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_H_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_I_01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Emote_location_I_02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Help01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Help02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Help03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Help04"
+        },
+        {
+            "name": "Veteran Pal Tamer",
+            "asset": "DeathPenalty_guide"
+        },
+        {
+            "name": "Friendly Pal Tamer",
+            "asset": "Respawn_guide"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_TreasureGuard_NarrowSite"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Vigilance"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_BowGun"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Prisoner"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_Prisoner"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_Prisoner"
+        },
+        {
+            "name": "Jailed Ex-Chief",
+            "asset": "Police_old_Prisoner"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Scientist_Prisoner"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja_Prisoner"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Viking_Prisoner"
+        },
+        {
+            "name": "Free Pal Alliance Judicator",
+            "asset": "Believer_Fat_Prisoner"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Hunter_Fat_Prisoner"
+        },
+        {
+            "name": "Police_Chief",
+            "asset": "Police_Chief"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_Rifle_Relax"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_FlameThrower_Relax"
+        },
+        {
+            "name": "Syndicate Laser Rifleman",
+            "asset": "Hunter_LaserRifle"
+        },
+        {
+            "name": "Syndicate Crossbowman",
+            "asset": "Hunter_BowGun"
+        },
+        {
+            "name": "Syndicate Swordsman",
+            "asset": "Hunter_Katana"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja_NoEquip"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "NinjaElite_NoEquip"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja_Bowgun"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "NinjaElite_Bowgun"
+        },
+        {
+            "name": "Zoe",
+            "asset": "GrassBoss"
+        },
+        {
+            "name": "ForestBoss",
+            "asset": "ForestBoss"
+        },
+        {
+            "name": "DesertBoss",
+            "asset": "DesertBoss"
+        },
+        {
+            "name": "ElectricBoss",
+            "asset": "ElectricBoss"
+        },
+        {
+            "name": "SnowBoss",
+            "asset": "SnowBoss"
+        },
+        {
+            "name": "SakurajimaBoss",
+            "asset": "SakurajimaBoss"
+        },
+        {
+            "name": "VikingBoss",
+            "asset": "VikingBoss"
+        },
+        {
+            "name": "ArenaShop",
+            "asset": "ArenaShop"
+        },
+        {
+            "name": "Newbie Pal Tamer",
+            "asset": "Arena_Male_Soldier02"
+        },
+        {
+            "name": "Up-and-Coming Pal Tamer",
+            "asset": "Arena_Female_Soldier02"
+        },
+        {
+            "name": "Cruel Pal Tamer",
+            "asset": "Arena_Male_Soldier03"
+        },
+        {
+            "name": "Veteran Pal Tamer",
+            "asset": "Arena_Female_Soldier03"
+        },
+        {
+            "name": "Sturdy Mercenary",
+            "asset": "Arena_Soldier"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Arena_Hunter_Fat_GatlingGun"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "Arena_FireCult_FlameThrower"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Arena_Ninja"
+        },
+        {
+            "name": "Messenger of Love",
+            "asset": "Arena_Reward_Emote"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Arena_Scientist_LaserRifle"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Arena_Viking"
+        },
+        {
+            "name": "Vigorous Pal Tamer",
+            "asset": "Arena_Male_Soldier04"
+        },
+        {
+            "name": "Pal Ecological Researcher",
+            "asset": "Arena_Reward_Paldex"
+        },
+        {
+            "name": "Sweet-Smelling Hunter",
+            "asset": "Arena_Ranger04"
+        },
+        {
+            "name": "Reincarnated Guy",
+            "asset": "Arena_Male_Police_old"
+        },
+        {
+            "name": "Friendly Pal Tamer",
+            "asset": "Arena_Female_Presenter"
+        },
+        {
+            "name": "Dr. Brawn",
+            "asset": "Arena_PalPassive_Doctor"
+        },
+        {
+            "name": "Medal Merchant",
+            "asset": "Arena_Male_DarkTrader02"
+        },
+        {
+            "name": "Master Pal Tamer",
+            "asset": "Arena_Female_Soldier04"
+        },
+        {
+            "name": "Fiery Pal Tamer",
+            "asset": "Arena_Male_Soldier02_Invader"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "Arena_NinjaElite"
+        },
+        {
+            "name": "Feybreak Berserker",
+            "asset": "Arena_VikingElite"
+        },
+        {
+            "name": "Legend-Loving Researcher",
+            "asset": "Arena_Scholar01"
+        },
+        {
+            "name": "Veteran Hunter",
+            "asset": "Arena_BossDefeat"
+        },
+        {
+            "name": "Black Marketeer",
+            "asset": "Arena_DarkTrader"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Farmer01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Farmer01_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Farmer01_v03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Farmer01_v04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar01_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar01_v03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar01_v04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Breeder01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Breeder01_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Breeder01_v03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Breeder01_v04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Ranger01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Ranger01_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Ranger01_v03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Ranger01_v04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Nomad01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Nomad01_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Nomad01_v03"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Nomad01_v04"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Angler01_v01"
+        },
+        {
+            "name": "Syndicate Swordsman",
+            "asset": "Quest_Hunter_Katana01"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Quest_Hunter_RocketLauncher01"
+        },
+        {
+            "name": "Syndicate Crusher",
+            "asset": "Quest_Hunter_Fat_GatlingGun01"
+        },
+        {
+            "name": "Syndicate Cleaner",
+            "asset": "Quest_Hunter_FlameThrower"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_Bat_Camp02"
+        },
+        {
+            "name": "Free Pal Alliance Believer",
+            "asset": "Believer_CrossBow_Camp02"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Shield_Tower"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Kigurumi01_v01"
+        },
+        {
+            "name": "Negotiator",
+            "asset": "Negotiator"
+        },
+        {
+            "name": "Patrol Drone",
+            "asset": "WildlifeSanctuaryDrone"
+        },
+        {
+            "name": "WorldTree_Hunter_MissileLauncher_test",
+            "asset": "WorldTree_Hunter_MissileLauncher_test"
+        },
+        {
+            "name": "Fia",
+            "asset": "Female_SurveyGirl01"
+        },
+        {
+            "name": "Fia",
+            "asset": "Female_SurveyGirl02"
+        },
+        {
+            "name": "Fia",
+            "asset": "Female_SurveyGirl03"
+        },
+        {
+            "name": "Carla",
+            "asset": "Female_SurveyWoman01"
+        },
+        {
+            "name": "Carla",
+            "asset": "Female_SurveyWoman02"
+        },
+        {
+            "name": "Gadel",
+            "asset": "Male_SurveyMan01"
+        },
+        {
+            "name": "Gadel",
+            "asset": "Male_SurveyMan02"
+        },
+        {
+            "name": "Gadel",
+            "asset": "Male_SurveyMan03"
+        },
+        {
+            "name": "Harold",
+            "asset": "Male_StrongOldMan01"
+        },
+        {
+            "name": "Harold",
+            "asset": "Male_StrongOldMan02"
+        },
+        {
+            "name": "Syndicate Thug",
+            "asset": "Hunter_Handgun_Quest_StrongOldMan"
+        },
+        {
+            "name": "Syndicate Hunter",
+            "asset": "Hunter_Shotgun_Quest_StrongOldMan"
+        },
+        {
+            "name": "Syndicate Elite",
+            "asset": "Hunter_RocketLauncher_Quest_StrongOldMan"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_Paldex_v02"
+        },
+        {
+            "name": "Guard",
+            "asset": "Reward_PalCaptureCount_v02"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Farmer01_v05"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar01_v05"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Breeder01_v05"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Ranger01_v05"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_Nomad01_v05"
+        },
+        {
+            "name": "Elder",
+            "asset": "BOSS_Hunter_Fat_GatlingGun_Quest_StrongOldMan"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_GrenadeLauncher"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_RocketLauncher"
+        },
+        {
+            "name": "Brothers of the Eternal Pyre Martyr",
+            "asset": "FireCult_MissileLauncher"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Scientist_GrenadeLauncher"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Scientist_MissileLauncher"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja_Grenade"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "NinjaElite_Grenade"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Viking_Melee"
+        },
+        {
+            "name": "Feybreak Warrior",
+            "asset": "Viking_GrenadeLauncher"
+        },
+        {
+            "name": "Feybreak Berserker",
+            "asset": "Viking_RocketLauncher"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_DTairikuPeople01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_DTairikuPeople01_v01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_TenrakuPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_TenrakuPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_SnowPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_SnowPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_SakurajimaPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_SakurajimaPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_SorajimaPeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_SorajimaPeople01"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Invader_Rifle"
+        },
+        {
+            "name": "PIDF Guard",
+            "asset": "Police_Invader_Handgun"
+        },
+        {
+            "name": "PIDF Elite",
+            "asset": "Police_Invader_Shotgun"
+        },
+        {
+            "name": "PIDF Blader",
+            "asset": "Police_Invader_Katana"
+        },
+        {
+            "name": "PIDF Rioter",
+            "asset": "Police_Invader_CrossBow"
+        },
+        {
+            "name": "PIDF Technophile",
+            "asset": "Police_Invader_LaserRifle"
+        },
+        {
+            "name": "PIDF Veteran",
+            "asset": "Police_Invader_GrenadeLauncher"
+        },
+        {
+            "name": "PIDF Cleaner",
+            "asset": "Police_Invader_FlameThrower"
+        },
+        {
+            "name": "PIDF Rocketeer",
+            "asset": "Police_Invader_RocketLauncher"
+        },
+        {
+            "name": "PIDF Interceptor",
+            "asset": "Police_Invader_MissileLauncher"
+        },
+        {
+            "name": "Attack Chopper",
+            "asset": "SecurityDrone_Field"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_WorldTreePeople01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Female_WorldTreePeople01"
+        },
+        {
+            "name": "Arena_Legend_1",
+            "asset": "Arena_Legend_1"
+        },
+        {
+            "name": "Arena_Legend_2",
+            "asset": "Arena_Legend_2"
+        },
+        {
+            "name": "Arena_Legend_3",
+            "asset": "Arena_Legend_3"
+        },
+        {
+            "name": "Arena_Legend_4",
+            "asset": "Arena_Legend_4"
+        },
+        {
+            "name": "Arena_Legend_5",
+            "asset": "Arena_Legend_5"
+        },
+        {
+            "name": "Arena_Legend_6",
+            "asset": "Arena_Legend_6"
+        },
+        {
+            "name": "Arena_Legend_7",
+            "asset": "Arena_Legend_7"
+        },
+        {
+            "name": "Arena_Legend_8",
+            "asset": "Arena_Legend_8"
+        },
+        {
+            "name": "Arena_Legend_9",
+            "asset": "Arena_Legend_9"
+        },
+        {
+            "name": "Arena_Legend_10",
+            "asset": "Arena_Legend_10"
+        },
+        {
+            "name": "Arena_Legend_11",
+            "asset": "Arena_Legend_11"
+        },
+        {
+            "name": "Arena_Legend_12",
+            "asset": "Arena_Legend_12"
+        },
+        {
+            "name": "Arena_Legend_13",
+            "asset": "Arena_Legend_13"
+        },
+        {
+            "name": "Arena_Legend_14",
+            "asset": "Arena_Legend_14"
+        },
+        {
+            "name": "Arena_Legend_15",
+            "asset": "Arena_Legend_15"
+        },
+        {
+            "name": "Arena_Legend_16",
+            "asset": "Arena_Legend_16"
+        },
+        {
+            "name": "Arena_Legend_17",
+            "asset": "Arena_Legend_17"
+        },
+        {
+            "name": "Arena_Legend_18",
+            "asset": "Arena_Legend_18"
+        },
+        {
+            "name": "Arena_Legend_19",
+            "asset": "Arena_Legend_19"
+        },
+        {
+            "name": "Arena_Legend_20",
+            "asset": "Arena_Legend_20"
+        },
+        {
+            "name": "Azure Covenant Enforcer",
+            "asset": "Female_Kunoichi01"
+        },
+        {
+            "name": "Islander",
+            "asset": "Male_Scholar02"
+        },
+        {
+            "name": "Caravan Leader",
+            "asset": "CaravanLeader04"
+        },
+        {
+            "name": "Butcher in Training",
+            "asset": "Male_Trader01_v04"
+        },
+        {
+            "name": "Village Grocer",
+            "asset": "Male_Trader01_v05"
+        },
+        {
+            "name": "Smugglers' Lackey",
+            "asset": "Male_Trader01_v06"
+        },
+        {
+            "name": "Foraging Merchant",
+            "asset": "Male_Trader01_v07"
+        },
+        {
+            "name": "Bakery Stand Baker",
+            "asset": "Male_Trader01_v08"
+        },
+        {
+            "name": "Shady Pharmacist",
+            "asset": "Male_Trader01_v09"
+        },
+        {
+            "name": "Surf & Turf Master",
+            "asset": "Male_Trader01_v10"
+        },
+        {
+            "name": "Expert Hunter",
+            "asset": "Male_Trader01_v11"
+        },
+        {
+            "name": "Legendary Game Hunter",
+            "asset": "Male_Trader01_v12"
+        },
+        {
+            "name": "Mercenary Supplier",
+            "asset": "Male_Trader01_v13"
+        },
+        {
+            "name": "Heavy Arms Merchant",
+            "asset": "Male_Trader01_v14"
+        },
+        {
+            "name": "Legendary Ammo Merchant",
+            "asset": "Male_Trader01_v15"
+        },
+        {
+            "name": "Farm Peddler",
+            "asset": "Male_Trader01_v16"
+        },
+        {
+            "name": "Legendary Grocer",
+            "asset": "Male_Trader01_v17"
+        },
+        {
+            "name": "Authorized Pharmacist",
+            "asset": "Male_Trader01_v18"
+        },
+        {
+            "name": "Legendary Pharmacist",
+            "asset": "Male_Trader01_v19"
+        },
+        {
+            "name": "Local Restaurateur",
+            "asset": "Male_Trader01_v20"
+        },
+        {
+            "name": "Novice Gourmet",
+            "asset": "Male_Trader01_v21"
+        },
+        {
+            "name": "Legendary Gourmet",
+            "asset": "Male_Trader01_v22"
+        },
+        {
+            "name": "Authorized Materials Merchant",
+            "asset": "Male_Trader01_v23"
+        },
+        {
+            "name": "Element Merchant",
+            "asset": "Male_Trader01_v24"
+        },
+        {
+            "name": "Legendary Materials Merchant",
+            "asset": "Male_Trader01_v25"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Quest_Male_Scientist01_LaserRifle"
+        },
+        {
+            "name": "PAL Genetic Research Unit Executioner",
+            "asset": "Quest_Scientist_FlameThrower"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Quest_Male_Ninja01"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "Quest_Male_NinjaElite01"
+        },
+        {
+            "name": "Fia",
+            "asset": "Female_SurveyGirl04"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Male_Ninja01_Seabase"
+        },
+        {
+            "name": "Moonflower Jonin",
+            "asset": "Male_NinjaElite01_Seabase"
+        },
+        {
+            "name": "Moonflower Genin",
+            "asset": "Ninja_Bowgun_Seabase"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Rifle_Crime_Lv4"
+        },
+        {
+            "name": "PIDF Rifleman",
+            "asset": "Police_Rifle_Crime_Lv5"
+        },
+        {
+            "name": "Islander",
+            "asset": "SorajimaTowerGuide"
+        },
+        {
+            "name": "Newbie Pal Tamer",
+            "asset": "WildlifeSanctuary_guide"
+        },
+        {
+            "name": "Wandering Merchant",
+            "asset": "NPC_Dungeon_Shop"
+        }
+    ]
+}
