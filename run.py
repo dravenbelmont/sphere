@@ -22,18 +22,15 @@ def clean_env_var(val: str) -> str:
         return ""
     val = val.strip()
     
-    # 1. Check for standard Markdown link pattern: [label](http://...)
     md_match = re.search(r'\[.*?\]\((https?://[^\)]+)\)', val)
     if md_match:
         return md_match.group(1).strip()
         
-    # 2. Extract first valid http(s) URL if wrapped in stray characters
     if "http://" in val or "https://" in val:
         url_match = re.search(r'https?://[^\s\)\]"]+', val)
         if url_match:
             return url_match.group(0).strip()
             
-    # 3. Fallback: Strip quotes, brackets, and whitespace
     return val.strip(" []()\"'")
 
 # ---------------------------------------------------------
@@ -56,7 +53,6 @@ def start_health_server():
     except Exception as e:
         print(f"[HEALTH CHECK ERROR] {e}", file=sys.stderr, flush=True)
 
-# Fixed: explicitly assigned target=start_health_server
 threading.Thread(target=start_health_server, daemon=True).start()
 
 # ---------------------------------------------------------
@@ -88,7 +84,7 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 # 3. REST API Helper Functions
 # ---------------------------------------------------------
 async def fetch_palworld_api(endpoint: str):
-    """Fetches data from the Palworld REST API using Basic Auth (admin:AdminPassword)."""
+    """Fetches data from the Palworld REST API using Basic Auth."""
     if not REST_API_URL or not ADMIN_PASSWORD:
         return None
         
@@ -101,11 +97,33 @@ async def fetch_palworld_api(endpoint: str):
                 if resp.status == 200:
                     return await resp.json()
                 else:
-                    print(f"[REST API ERROR] Status {resp.status} on {endpoint}", flush=True)
+                    print(f"[REST API ERROR] Status {resp.status} on GET {endpoint}", flush=True)
                     return None
     except Exception as e:
-        print(f"[REST API CONNECTION ERROR] Failed to reach {url}: {e}", file=sys.stderr, flush=True)
+        print(f"[REST API ERROR] Failed to reach {url}: {e}", file=sys.stderr, flush=True)
         return None
+
+async def send_palworld_announce(message_text: str) -> bool:
+    """Broadcasts a message to players in-game via REST API /v1/api/announce."""
+    if not REST_API_URL or not ADMIN_PASSWORD:
+        return False
+        
+    url = f"{REST_API_URL.rstrip('/')}/v1/api/announce"
+    auth = aiohttp.BasicAuth(login="admin", password=ADMIN_PASSWORD)
+    payload = {"message": message_text}
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, auth=auth, json=payload, timeout=5) as resp:
+                if resp.status == 200:
+                    print(f"[ANNOUNCE SUCCESS] Sent in-game: {message_text}", flush=True)
+                    return True
+                else:
+                    print(f"[ANNOUNCE ERROR] Status {resp.status} sending announce", flush=True)
+                    return False
+    except Exception as e:
+        print(f"[ANNOUNCE ERROR] Failed to send broadcast: {e}", file=sys.stderr, flush=True)
+        return False
 
 # Background Task: Periodically Log Active Players
 @tasks.loop(minutes=2)
@@ -124,7 +142,6 @@ async def on_ready():
     print(f"==========================================", flush=True)
     print(f" SUCCESS: Bot logged in as {bot.user}", flush=True)
     print(f" Monitoring Channel ID: {CHANNEL_ID or 'NOT SET'}", flush=True)
-    print(f" Target RCON Host: {RCON_HOST}:{RCON_PORT}", flush=True)
     print(f" Target REST API: {REST_API_URL}", flush=True)
     print(f"==========================================", flush=True)
     if not check_server_status.is_running():
@@ -132,7 +149,7 @@ async def on_ready():
 
 @bot.command(name="players")
 async def list_players(ctx):
-    """Discord command: !players to see who is currently in-game."""
+    """Discord command: !players"""
     data = await fetch_palworld_api("players")
     if not data or "players" not in data:
         await ctx.send("❌ Unable to reach Palworld REST API.")
@@ -156,17 +173,22 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
-    # Discord -> Game Broadcast Relay
+    # Discord -> Game Announcement Relay
     if CHANNEL_ID and str(message.channel.id) == str(CHANNEL_ID):
         author = message.author.display_name
         clean_content = message.clean_content.replace("\n", " ")
-        print(f"[RELAY DISCORD -> GAME] {author}: {clean_content}", flush=True)
+        announcement = f"{author}: {clean_content}"
         
-        # Send broadcast via RCON
-        if RCON_HOST and RCON_PASSWORD:
+        print(f"[RELAY DISCORD -> GAME] Sending: {announcement}", flush=True)
+        
+        # 1. Primary: Send via REST API
+        success = await send_palworld_announce(announcement)
+        
+        # 2. Fallback: Try RCON if REST failed
+        if not success and RCON_HOST and RCON_PASSWORD:
             try:
-                async with GameRCON(RCON_HOST, RCON_PORT, RCON_PASSWORD, timeout=10) as rcon:
-                    await rcon.send(f"Broadcast {author}:_{clean_content}")
+                async with GameRCON(RCON_HOST, RCON_PORT, RCON_PASSWORD, timeout=5) as rcon:
+                    await rcon.send(f'Broadcast "{announcement}"')
             except Exception as e:
                 print(f"[RCON ERROR] {e}", file=sys.stderr, flush=True)
 
