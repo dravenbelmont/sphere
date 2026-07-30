@@ -27,5 +27,4 @@ COPY . .
 EXPOSE 10000
 
 # Start command
-# IMPORTANT: If your entry script is named "bot.py" or "run.py" instead of "main.py", change it below!
-CMD ["python", "main.py"]
+CMD ["python", "run.py"]
