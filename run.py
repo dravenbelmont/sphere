@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import asyncio
 import threading
@@ -11,6 +12,29 @@ from gamercon_async import GameRCON
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ---------------------------------------------------------
+# Helper: Clean Markdown Links & Extra Formatting from Env Vars
+# ---------------------------------------------------------
+def clean_env_var(val: str) -> str:
+    """Strips Markdown link syntax, brackets, and quotes from env vars."""
+    if not val:
+        return ""
+    val = val.strip()
+    
+    # 1. Check for standard Markdown link pattern: [label](http://...)
+    md_match = re.search(r'\[.*?\]\((https?://[^\)]+)\)', val)
+    if md_match:
+        return md_match.group(1).strip()
+        
+    # 2. Extract first valid http(s) URL if wrapped in stray characters
+    if "http://" in val or "https://" in val:
+        url_match = re.search(r'https?://[^\s\)\]"]+', val)
+        if url_match:
+            return url_match.group(0).strip()
+            
+    # 3. Fallback: Strip quotes, brackets, and whitespace
+    return val.strip(" []()\"'")
 
 # ---------------------------------------------------------
 # 1. Background Health Server for Render
@@ -32,21 +56,22 @@ def start_health_server():
     except Exception as e:
         print(f"[HEALTH CHECK ERROR] {e}", file=sys.stderr, flush=True)
 
-threading.Thread(target=start_health_server, daemon=True).start()
+threading.Thread(start_health_server, daemon=True).start()
 
 # ---------------------------------------------------------
 # 2. Environment Variables & Bot Setup
 # ---------------------------------------------------------
-TOKEN = os.environ.get("BOT_TOKEN") or os.environ.get("DISCORD_TOKEN") or os.environ.get("TOKEN")
-PREFIX = os.environ.get("BOT_PREFIX", "!")
-CHANNEL_ID = os.environ.get("CHANNEL_ID")
+TOKEN = clean_env_var(os.environ.get("BOT_TOKEN") or os.environ.get("DISCORD_TOKEN") or os.environ.get("TOKEN"))
+PREFIX = clean_env_var(os.environ.get("BOT_PREFIX", "!"))
+CHANNEL_ID = clean_env_var(os.environ.get("CHANNEL_ID"))
 
-RCON_HOST = os.environ.get("RCON_HOST", "167.114.174.145")
-RCON_PORT = int(os.environ.get("RCON_PORT", 25575)) if os.environ.get("RCON_PORT") else 25575
-RCON_PASSWORD = os.environ.get("RCON_PASSWORD")
+RCON_HOST = clean_env_var(os.environ.get("RCON_HOST", "167.114.174.145"))
+RCON_PORT_RAW = clean_env_var(os.environ.get("RCON_PORT", "25575"))
+RCON_PORT = int(RCON_PORT_RAW) if RCON_PORT_RAW.isdigit() else 25575
+RCON_PASSWORD = clean_env_var(os.environ.get("RCON_PASSWORD"))
 
-REST_API_URL = os.environ.get("REST_API_URL", "http://167.114.174.145:8212")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or RCON_PASSWORD
+REST_API_URL = clean_env_var(os.environ.get("REST_API_URL", "http://167.114.174.145:27014"))
+ADMIN_PASSWORD = clean_env_var(os.environ.get("ADMIN_PASSWORD")) or RCON_PASSWORD
 
 if not TOKEN:
     print("[FATAL ERROR] No Discord bot token found!", file=sys.stderr, flush=True)
