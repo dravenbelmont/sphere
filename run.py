@@ -5,6 +5,7 @@ import asyncio
 import threading
 import traceback
 import aiohttp
+import paramiko
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import discord
 from discord.ext import commands, tasks
@@ -70,6 +71,14 @@ RCON_PASSWORD = clean_env_var(os.environ.get("RCON_PASSWORD"))
 REST_API_URL = clean_env_var(os.environ.get("REST_API_URL", "http://167.114.174.145:27014"))
 ADMIN_PASSWORD = clean_env_var(os.environ.get("ADMIN_PASSWORD")) or RCON_PASSWORD
 
+# SFTP Configuration for Game -> Discord Chat Tailing
+SFTP_HOST = clean_env_var(os.environ.get("SFTP_HOST")) or RCON_HOST
+SFTP_PORT_RAW = clean_env_var(os.environ.get("SFTP_PORT", "22"))
+SFTP_PORT = int(SFTP_PORT_RAW) if SFTP_PORT_RAW.isdigit() else 22
+SFTP_USER = clean_env_var(os.environ.get("SFTP_USER"))
+SFTP_PASS = clean_env_var(os.environ.get("SFTP_PASSWORD"))
+SFTP_LOG_PATH = clean_env_var(os.environ.get("SFTP_LOG_PATH"))
+
 if not TOKEN:
     print("[FATAL ERROR] No Discord bot token found!", file=sys.stderr, flush=True)
     sys.exit(1)
@@ -79,6 +88,9 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+# Track position in remote log file so we only send new lines
+last_log_offset = 0
 
 # ---------------------------------------------------------
 # 3. REST API Helper Functions
@@ -97,7 +109,6 @@ async def fetch_palworld_api(endpoint: str):
                 if resp.status == 200:
                     return await resp.json()
                 else:
-                    print(f"[REST API ERROR] Status {resp.status} on GET {endpoint}", flush=True)
                     return None
     except Exception as e:
         print(f"[REST API ERROR] Failed to reach {url}: {e}", file=sys.stderr, flush=True)
@@ -119,13 +130,14 @@ async def send_palworld_announce(message_text: str) -> bool:
                     print(f"[ANNOUNCE SUCCESS] Sent in-game: {message_text}", flush=True)
                     return True
                 else:
-                    print(f"[ANNOUNCE ERROR] Status {resp.status} sending announce", flush=True)
                     return False
     except Exception as e:
         print(f"[ANNOUNCE ERROR] Failed to send broadcast: {e}", file=sys.stderr, flush=True)
         return False
 
-# Background Task: Periodically Log Active Players
+# ---------------------------------------------------------
+# 4. Background Tasks (Players & SFTP Chat Tailer)
+# ---------------------------------------------------------
 @tasks.loop(minutes=2)
 async def check_server_status():
     data = await fetch_palworld_api("players")
@@ -134,8 +146,62 @@ async def check_server_status():
         player_names = [p.get("name", "Unknown") for p in players]
         print(f"[REST API] Online Players ({len(players)}): {', '.join(player_names)}", flush=True)
 
+@tasks.loop(seconds=5)
+async def poll_sftp_chat():
+    """Polls server log file over SFTP and forwards in-game chat to Discord."""
+    global last_log_offset
+    
+    if not (SFTP_HOST and SFTP_USER and SFTP_PASS and SFTP_LOG_PATH):
+        return
+
+    def _read_remote_log():
+        global last_log_offset
+        new_lines = []
+        try:
+            transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+            transport.connect(username=SFTP_USER, password=SFTP_PASS)
+            sftp = paramiko.SFTPClient.from_transport(transport)
+
+            try:
+                stat = sftp.stat(SFTP_LOG_PATH)
+                file_size = stat.st_size
+
+                # First run: start reading from current end of file
+                if last_log_offset == 0:
+                    last_log_offset = file_size
+
+                if file_size > last_log_offset:
+                    with sftp.open(SFTP_LOG_PATH, 'r') as f:
+                        f.seek(last_log_offset)
+                        content = f.read().decode('utf-8', errors='ignore')
+                        last_log_offset = f.tell()
+                        new_lines = content.splitlines()
+                elif file_size < last_log_offset:
+                    # Log was rotated or wiped
+                    last_log_offset = 0
+            finally:
+                sftp.close()
+                transport.close()
+        except Exception as e:
+            print(f"[SFTP ERROR] {e}", file=sys.stderr, flush=True)
+
+        return new_lines
+
+    # Run blocking SFTP operations in a background thread
+    lines = await asyncio.to_thread(_read_remote_log)
+    
+    if lines and CHANNEL_ID:
+        channel = bot.get_channel(int(CHANNEL_ID))
+        if channel:
+            for line in lines:
+                # Filter for in-game chat lines (e.g., [Chat], [CHAT], PalGuard formats)
+                if any(kw in line.lower() for kw in ["chat", "say"]):
+                    # Strip raw formatting if necessary
+                    clean_line = re.sub(r'^\s*\[.*?\]\s*', '', line).strip()
+                    await channel.send(f"💬 **[Game Chat]** {clean_line if clean_line else line}")
+
 # ---------------------------------------------------------
-# 4. Events & Commands
+# 5. Events & Commands
 # ---------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -143,9 +209,14 @@ async def on_ready():
     print(f" SUCCESS: Bot logged in as {bot.user}", flush=True)
     print(f" Monitoring Channel ID: {CHANNEL_ID or 'NOT SET'}", flush=True)
     print(f" Target REST API: {REST_API_URL}", flush=True)
+    print(f" SFTP Log Monitoring: {'ENABLED' if SFTP_USER and SFTP_LOG_PATH else 'DISABLED (Missing Credentials)'}", flush=True)
     print(f"==========================================", flush=True)
+    
     if not check_server_status.is_running():
         check_server_status.start()
+        
+    if not poll_sftp_chat.is_running() and SFTP_USER and SFTP_LOG_PATH:
+        poll_sftp_chat.start()
 
 @bot.command(name="players")
 async def list_players(ctx):
@@ -180,22 +251,12 @@ async def on_message(message: discord.Message):
         announcement = f"{author}: {clean_content}"
         
         print(f"[RELAY DISCORD -> GAME] Sending: {announcement}", flush=True)
-        
-        # 1. Primary: Send via REST API
-        success = await send_palworld_announce(announcement)
-        
-        # 2. Fallback: Try RCON if REST failed
-        if not success and RCON_HOST and RCON_PASSWORD:
-            try:
-                async with GameRCON(RCON_HOST, RCON_PORT, RCON_PASSWORD, timeout=5) as rcon:
-                    await rcon.send(f'Broadcast "{announcement}"')
-            except Exception as e:
-                print(f"[RCON ERROR] {e}", file=sys.stderr, flush=True)
+        await send_palworld_announce(announcement)
 
     await bot.process_commands(message)
 
 # ---------------------------------------------------------
-# 5. Entry Point
+# 6. Entry Point
 # ---------------------------------------------------------
 async def main():
     async with bot:
