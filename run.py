@@ -1,14 +1,19 @@
-import sys
-from pathlib import Path
+import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-src_path = Path(__file__).parent / "src"
-sys.path.insert(0, str(src_path))
+# Background web server to satisfy Render's port binding requirement
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Project Sphere is live!")
+    def log_message(self, format, *args):
+        return  # Silence standard HTTP logs in Render output
 
-from main import bot
-import utils.settings as settings
-import logging
+def start_health_check_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
 
-if __name__ == '__main__':
-    from utils.errorhandling import STARTUP_CHECK
-    logging.info(bytes.fromhex(STARTUP_CHECK).decode())
-    bot.run(settings.bot_token)
+threading.Thread(target=start_health_check_server, daemon=True).start()
