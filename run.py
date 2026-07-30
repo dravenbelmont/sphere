@@ -56,7 +56,8 @@ def start_health_server():
     except Exception as e:
         print(f"[HEALTH CHECK ERROR] {e}", file=sys.stderr, flush=True)
 
-threading.Thread(start_health_server, daemon=True).start()
+# Fixed: explicitly assigned target=start_health_server
+threading.Thread(target=start_health_server, daemon=True).start()
 
 # ---------------------------------------------------------
 # 2. Environment Variables & Bot Setup
