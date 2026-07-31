@@ -298,7 +298,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        async carefully = asyncio.run(main())
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("[INFO] Bot shutting down...", flush=True)
     except Exception as e:
