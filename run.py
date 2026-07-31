@@ -1,6 +1,8 @@
 import os
 import re
 import sys
+import stat
+import posixpath
 import asyncio
 import threading
 import traceback
@@ -89,8 +91,14 @@ intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-# Track position in remote log file so we only send new lines
+# Track active file and read offset in remote log file
+current_log_file = ""
 last_log_offset = 0
+
+# PalDefender Chat Line Matcher: Matches `[Chat::Global]['PlayerName'...]: Message`
+PALDEFENDER_CHAT_REGEX = re.compile(
+    r"\[Chat::\w+\]\['(?P<player>[^']+)'[^\]]*\](?:\[[^\]]+\])*:\s*(?P<message>.*)"
+)
 
 # ---------------------------------------------------------
 # 3. REST API Helper Functions
@@ -146,16 +154,16 @@ async def check_server_status():
         player_names = [p.get("name", "Unknown") for p in players]
         print(f"[REST API] Online Players ({len(players)}): {', '.join(player_names)}", flush=True)
 
-@tasks.loop(seconds=5)
+@tasks.loop(seconds=4)
 async def poll_sftp_chat():
     """Polls server log file over SFTP and forwards in-game chat to Discord."""
-    global last_log_offset
+    global current_log_file, last_log_offset
     
     if not (SFTP_HOST and SFTP_USER and SFTP_PASS and SFTP_LOG_PATH):
         return
 
     def _read_remote_log():
-        global last_log_offset
+        global current_log_file, last_log_offset
         new_lines = []
         try:
             transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
@@ -163,22 +171,41 @@ async def poll_sftp_chat():
             sftp = paramiko.SFTPClient.from_transport(transport)
 
             try:
-                stat = sftp.stat(SFTP_LOG_PATH)
-                file_size = stat.st_size
+                target_path = SFTP_LOG_PATH
+                
+                # Check if SFTP_LOG_PATH is a directory or direct file
+                try:
+                    file_stat = sftp.stat(SFTP_LOG_PATH)
+                    if stat.S_ISDIR(file_stat.st_mode):
+                        files = sftp.listdir_attr(SFTP_LOG_PATH)
+                        log_files = [f for f in files if f.filename.endswith('.log')]
+                        if log_files:
+                            # Pick the file with the newest modification timestamp
+                            latest_file = max(log_files, key=lambda f: f.st_mtime)
+                            target_path = posixpath.join(SFTP_LOG_PATH, latest_file.filename)
+                        else:
+                            return []
+                except Exception:
+                    pass
 
-                # First run: start reading from current end of file
-                if last_log_offset == 0:
-                    last_log_offset = file_size
+                # If server rebooted and created a new timestamped log file
+                if target_path != current_log_file:
+                    current_log_file = target_path
+                    last_log_offset = sftp.stat(target_path).st_size  # Start at end of new file
+                    print(f"[SFTP] Tailing active log file: {current_log_file}", flush=True)
+
+                file_size = sftp.stat(target_path).st_size
 
                 if file_size > last_log_offset:
-                    with sftp.open(SFTP_LOG_PATH, 'r') as f:
+                    with sftp.open(target_path, 'r') as f:
                         f.seek(last_log_offset)
                         content = f.read().decode('utf-8', errors='ignore')
                         last_log_offset = f.tell()
                         new_lines = content.splitlines()
                 elif file_size < last_log_offset:
-                    # Log was rotated or wiped
+                    # Log was wiped or truncated
                     last_log_offset = 0
+
             finally:
                 sftp.close()
                 transport.close()
@@ -194,9 +221,16 @@ async def poll_sftp_chat():
         channel = bot.get_channel(int(CHANNEL_ID))
         if channel:
             for line in lines:
-                # Filter for in-game chat lines (e.g., [Chat], [CHAT], PalGuard formats)
-                if any(kw in line.lower() for kw in ["chat", "say"]):
-                    # Strip raw formatting if necessary
+                # 1. Parse PalDefender chat format
+                match = PALDEFENDER_CHAT_REGEX.search(line)
+                if match:
+                    player_name = match.group("player")
+                    chat_msg = match.group("message")
+                    await channel.send(f"💬 **{player_name}**: {chat_msg}")
+                    continue
+
+                # 2. Fallback check for standard plugin chat lines
+                if any(kw in line.lower() for kw in ["chat::", "[chat]", "playerchat"]):
                     clean_line = re.sub(r'^\s*\[.*?\]\s*', '', line).strip()
                     await channel.send(f"💬 **[Game Chat]** {clean_line if clean_line else line}")
 
@@ -264,7 +298,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        async carefully = asyncio.run(main())
     except KeyboardInterrupt:
         print("[INFO] Bot shutting down...", flush=True)
     except Exception as e:
