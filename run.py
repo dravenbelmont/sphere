@@ -145,7 +145,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Strict Zero-IP Log Parser & SFTP Listener Loop
+# 5. Anti-IP Log Parser & SFTP Listener Loop
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
@@ -153,41 +153,45 @@ last_file_name = None
 def parse_secure_log_line(line: str):
     """
     Guarantees NO IP addresses are ever returned.
-    - Chat: Returns ('CHAT', name, message) -> No Steam ID, No IP
-    - Join: Returns ('JOIN', name, steam_id) -> Steam ID allowed, No IP
-    - Leave: Returns ('LEAVE', name, steam_id) -> Steam ID allowed, No IP
+    - Chat: Returns ('CHAT', name, message) -> Name only, no IDs, no IPs
+    - Join: Returns ('JOIN', name, platform_id) -> Name + Steam/Xbox/PS ID, no IPs
+    - Leave: Returns ('LEAVE', name, platform_id) -> Name + Steam/Xbox/PS ID, no IPs
     """
-    # 1. HARD SECURITY RULE: If an IP address pattern exists anywhere in the line, reject/sanitize immediately.
-    if re.search(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', line) or "IP=" in line:
-        # Check if it's a join/leave/chat line, but strip out the IP portion completely
-        pass
+    lower_line = line.lower()
 
-    # Extract player name safely from quotes
-    name_match = re.search(r"['\"]([^'\"]+)['\"]", line)
-    player_name = name_match.group(1) if name_match else None
+    # Extract platform ID (UserId=...)
+    userid_match = re.search(r"UserId=([^\s,\)]+)", line)
+    platform_id = userid_match.group(1) if userid_match else None
+
+    # Find valid player name from quotes, strictly ignoring IP addresses
+    quoted_strings = re.findall(r"['\"]([^'\"]+)['\"]", line)
+    player_name = None
+    for qs in quoted_strings:
+        # Ignore if string is an IP address
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', qs):
+            continue
+        # Ignore if string is a UID/GUID
+        if re.match(r'^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}', qs):
+            continue
+        player_name = qs
+        break
+
     if not player_name:
         return None, None, None
 
-    # Extract Steam ID (UserId) if present
-    userid_match = re.search(r"UserId=([^\s,\)]+)", line)
-    steam_id = userid_match.group(1) if userid_match else None
-
-    # Determine event type
-    lower_line = line.lower()
-    
+    # Classify event
     if "chat:" in lower_line or ":global]" in lower_line or ":local]" in lower_line or ":guild]" in lower_line:
         parts = line.split("]: ")
         message = parts[-1].strip() if len(parts) > 1 else line.split(":")[-1].strip()
-        # Ensure message has no accidental IP or UserId tags
-        message = re.sub(r'IP=[\d\.:]+', '', message)
-        message = re.sub(r'UserId=[^\s,]+', '', message)
+        # Clean any accidental IP leakage from message text
+        message = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[REDACTED]', message)
         return "CHAT", player_name, message
 
-    elif any(kw in lower_line for kw in ["join", "connected", "login", "spawn"]):
-        return "JOIN", player_name, steam_id
+    elif any(kw in lower_line for kw in ["join", "connected", "login", "spawn", "connect"]):
+        return "JOIN", player_name, platform_id
 
-    elif any(kw in lower_line for kw in ["leave", "disconnected", "logout", "disconnect"]):
-        return "LEAVE", player_name, steam_id
+    elif any(kw in lower_line for kw in ["leave", "disconnected", "logout", "disconnect", "quit"]):
+        return "LEAVE", player_name, platform_id
 
     return None, None, None
 
@@ -235,10 +239,10 @@ async def sftp_chat_listener_loop():
                 if event_type == "CHAT":
                     await channel.send(f"💬 **{name}**: {data}")
                 elif event_type == "JOIN":
-                    id_str = f" (Steam ID: `{data}`)" if data else ""
+                    id_str = f" (ID: `{data}`)" if data else ""
                     await channel.send(f"🟢 **{name}** joined the server.{id_str}")
                 elif event_type == "LEAVE":
-                    id_str = f" (Steam ID: `{data}`)" if data else ""
+                    id_str = f" (ID: `{data}`)" if data else ""
                     await channel.send(f"🔴 **{name}** left the server.{id_str}")
         except Exception as e:
             logger.error(f"SFTP Error: {e}")
@@ -307,7 +311,7 @@ class ShopPaginator(discord.ui.View):
         else: await interaction.response.defer()
 
 # -------------------------------------------------------------
-# 7. Discord Commands (Zero IP, Clean Outputs)
+# 7. Discord Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -324,7 +328,6 @@ async def list_players(ctx):
     if error: return await ctx.send(f"❌ Error: `{error}`")
     players = data.get("players", [])
     if not players: return await ctx.send("🎮 0 players online.")
-    # Displays ONLY player name and level. Absolutely no IPs or Steam IDs.
     list_str = "\n".join([f"• **{p.get('name', 'Unknown')}** (Level {p.get('level', '?')})" for p in players])
     await ctx.send(embed=discord.Embed(title=f"Online Players ({len(players)})", description=list_str, color=discord.Color.blue()))
 
@@ -334,7 +337,7 @@ async def register(ctx, player_uid: str):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         await conn.execute('INSERT INTO users (discord_id, player_uid) VALUES ($1, $2) ON CONFLICT (discord_id) DO UPDATE SET player_uid = $2', ctx.author.id, player_uid)
-        await ctx.send(f"✅ Registered linked UID.")
+        await ctx.send("✅ Registered linked UID.")
     finally:
         await conn.close()
 
