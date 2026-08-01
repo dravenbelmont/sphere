@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from aiohttp import web
 import discord
 from discord.ext import commands
@@ -182,12 +182,15 @@ async def init_db():
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 discord_id BIGINT PRIMARY KEY,
-                player_uid TEXT UNIQUE,
+                player_uid TEXT,
                 balance INTEGER DEFAULT 0,
                 last_daily TIMESTAMP
             )
         ''')
+        # Ensure unique index exists on player_uid for ON CONFLICT support even on existing tables
+        await conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_player_uid_idx ON users(player_uid)')
         await conn.close()
+        logger.info("✅ Database initialized successfully with player_uid unique index.")
     except Exception as e:
         logger.critical(f"Failed to connect to Supabase: {e}")
 
@@ -243,7 +246,7 @@ async def process_login_daily(player_uid: str, player_name: str):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT discord_id, balance, last_daily FROM users WHERE player_uid = $1', str(player_uid))
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         
         if row:
             last_daily = row['last_daily']
@@ -364,7 +367,7 @@ async def playtime_reward_loop():
             logger.error(f"Playtime loop error: {e}")
 
 # -------------------------------------------------------------
-# 6. Automated Background Restart & Save Loop
+# 6. Automated Background Restart & Save Loop (1 min pre-save)
 # -------------------------------------------------------------
 async def automated_restart_loop():
     await bot.wait_until_ready()
@@ -503,7 +506,7 @@ async def daily(ctx):
             return await ctx.send("❌ Use `!register <PlayerUID>` first!")
         
         balance, last_daily, player_uid = row['balance'], row['last_daily'], row['player_uid']
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if last_daily and now < last_daily + timedelta(days=1):
             return await ctx.send("⏳ You must wait 24 hours between claims.")
         
