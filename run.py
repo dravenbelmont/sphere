@@ -11,7 +11,7 @@ import aiohttp
 from gamercon_async import GameRCON
 
 # -------------------------------------------------------------
-# Logging Setup
+# 1. Logging Setup
 # -------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 1. Environment & Configuration
+# 2. Environment & Configuration
 # -------------------------------------------------------------
 DISCORD_TOKEN = (os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN") or "").strip().strip("[]()").strip()
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
@@ -31,14 +31,14 @@ WEB_PORT = int(os.getenv("PORT", "10000"))
 DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_URL") or "").strip().strip("[]()").strip()
 
 RCON_HOST = (os.getenv("RCON_HOST") or "127.0.0.1").strip().strip("[]()").strip()
-_rcon_port_val = (os.getenv("RCON_PORT") or os.getenv("PALWORLD_RCON_PORT") or os.getenv("SERVER_RCON_PORT") or os.getenv("GAME_RCON_PORT") or "25575").strip().strip("[]()").strip()
+_rcon_port_val = (os.getenv("RCON_PORT") or os.getenv("PALWORLD_RCON_PORT") or os.getenv("SERVER_RCON_PORT") or "25575").strip().strip("[]()").strip()
 RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
 
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 # -------------------------------------------------------------
-# 2. Daily Login Pack & Shop Items (Abbreviated for space - keep your existing ones)
+# 3. Daily Login Pack & Shop Items
 # -------------------------------------------------------------
 DAILY_PACK_SHOP_POINTS = 1000
 DAILY_PACK_ITEMS = [
@@ -56,9 +56,11 @@ SHOP_ITEMS = {
     "wood": {"name": "Wood", "id": "Wood", "price": 1, "category": "Ores & Materials"},
     "stone": {"name": "Stone", "id": "Stone", "price": 1, "category": "Ores & Materials"},
     "cake": {"name": "Cake", "id": "Cake", "price": 250, "category": "Food & Consumables"}
-    # Make sure to keep all your shop items from the previous script here!
 }
 
+# -------------------------------------------------------------
+# 4. Database Init
+# -------------------------------------------------------------
 async def init_db():
     if not DATABASE_URL: return
     try:
@@ -78,14 +80,14 @@ async def init_db():
         logger.critical(f"Failed to connect to Supabase: {e}")
 
 # -------------------------------------------------------------
-# 3. Discord Bot Init
+# 5. Discord Bot Init
 # -------------------------------------------------------------
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 4. Palworld REST API Helpers
+# 6. Palworld REST API Helpers
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -115,7 +117,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Automated Login Daily Reward & Player Tracking Loop
+# 7. Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
@@ -146,7 +148,6 @@ async def process_login_daily(player_uid: str, player_name: str):
                 ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
             ''', dummy_discord_id, str(player_uid), new_bal, now)
 
-        # Deliver daily items via RCON
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
                 await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
@@ -170,18 +171,12 @@ async def poll_palworld_players_loop():
                     current_players_map = {}
                     
                     for p in players:
-                        # Find unique tracker ID
                         pid = p.get("playeruid") or p.get("userid") or p.get("name")
                         pname = p.get("name", "Unknown")
-                        
-                        # Palworld REST API returns Steam ID or Console ID inside 'userid' or 'accountId'
                         account_id = p.get("userId") or p.get("userid") or p.get("accountId") or p.get("accountid") or "Unknown ID"
                         
                         if pid:
-                            current_players_map[str(pid)] = {
-                                "name": pname,
-                                "account_id": account_id
-                            }
+                            current_players_map[str(pid)] = {"name": pname, "account_id": account_id}
                             last_known_player_names[str(pid)] = pname
 
                     current_ids = set(current_players_map.keys())
@@ -207,7 +202,6 @@ async def poll_palworld_players_loop():
                             if channel:
                                 embed = discord.Embed(
                                     title="🟢 Player Joined",
-                                    # Includes the Steam/Console ID here
                                     description=f"**{name}** has joined the server!\n**Steam / Console ID:** `{account_id}`",
                                     color=discord.Color.green()
                                 )
@@ -230,7 +224,28 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 8. Discord Commands & Event Listeners
+# 8. Webhook Handler for Game ➔ Discord Chat
+# -------------------------------------------------------------
+async def handle_chat_webhook(request):
+    try:
+        data = await request.json()
+        
+        # Extract the name and message. We deliberately ignore IP and SteamID.
+        name = data.get("name", data.get("username", data.get("player", "Unknown Player")))
+        message = data.get("message", data.get("content", ""))
+        
+        channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
+        if channel and message:
+            # Clean format: Just the name and the message
+            await channel.send(f"💬 **{name}**: {message}")
+            
+        return web.Response(text="OK")
+    except Exception as e:
+        logger.error(f"Error processing incoming game chat webhook: {e}")
+        return web.Response(status=400)
+
+# -------------------------------------------------------------
+# 9. Discord Commands & Event Listeners
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -239,26 +254,23 @@ async def on_ready():
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
-        # bot.loop.create_task(playtime_reward_loop())   # Assuming you still have this from previous script
-        # bot.loop.create_task(automated_restart_loop()) # Assuming you still have this from previous script
 
 @bot.event
 async def on_message(message):
-    # 1. Always process commands first to ensure commands work anywhere
+    # Process standard commands first
     await bot.process_commands(message)
     
-    # 2. Ignore bot messages
+    # Ignore bot messages
     if message.author.bot:
         return
         
-    # 3. Two-Way Chat Relay (Discord -> Game)
+    # Discord ➔ Game Chat Relay
     if DISCORD_CHAT_CHANNEL_ID != 0 and message.channel.id == DISCORD_CHAT_CHANNEL_ID:
-        # Ignore if it starts with the command prefix
         if not message.content.startswith(BOT_PREFIX):
             if REST_API_URL and ADMIN_PASSWORD:
                 try:
-                    # Clean formatting: Just name and message. Strip out quotes and newlines to prevent payload breaking
                     clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
+                    # Clean format: Just Discord name and message
                     chat_text = f"[{message.author.display_name}] {clean_msg}"
                     
                     _, error = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
@@ -267,18 +279,32 @@ async def on_message(message):
                 except Exception as e:
                     logger.error(f"Failed to relay Discord message to game server: {e}")
 
-# Note: Keep the rest of your commands (!shop, !buy, !daily, etc.) from the previous script here!
+# Basic Shop Commands
+@bot.command(name="shop")
+async def shop(ctx):
+    embed = discord.Embed(title="Palworld Shop", color=discord.Color.blue())
+    for item_key, item_info in SHOP_ITEMS.items():
+        embed.add_field(name=item_info['name'], value=f"Cost: {item_info['price']} points\nID: `{item_key}`", inline=False)
+    await ctx.send(embed=embed)
 
 # -------------------------------------------------------------
-# 9. Web Server & Main
+# 10. Web Server & Main Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
+    
+    # Basic health check route
     app.router.add_get("/", lambda r: web.Response(text="OK"))
+    
+    # Listen for Game -> Discord Webhooks (matches standard mod configs)
+    app.router.add_post("/webhook", handle_chat_webhook)
+    
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", WEB_PORT).start()
-    async with bot: await bot.start(DISCORD_TOKEN)
+    
+    async with bot: 
+        await bot.start(DISCORD_TOKEN)
 
 if __name__ == "__main__":
     asyncio.run(main())
