@@ -151,19 +151,11 @@ last_position = 0
 last_file_name = None
 
 def parse_secure_log_line(line: str):
-    """
-    Guarantees NO IP addresses are ever returned.
-    - Chat: Returns ('CHAT', name, message) -> Name only, no IDs, no IPs
-    - Join: Returns ('JOIN', name, steam_id) -> Name + Steam ID, no IPs
-    - Leave: Returns ('LEAVE', name, steam_id) -> Name + Steam ID, no IPs
-    """
     lower_line = line.lower()
 
-    # Extract Steam ID / User ID
     userid_match = re.search(r"(?:UserId|UID|SteamId)=([^\s,\)]+)", line, re.IGNORECASE)
     steam_id = userid_match.group(1) if userid_match else None
 
-    # Find valid player name from quotes, strictly ignoring IP addresses and GUIDs
     quoted_strings = re.findall(r"['\"]([^'\"]+)['\"]", line)
     player_name = None
     for qs in quoted_strings:
@@ -174,7 +166,6 @@ def parse_secure_log_line(line: str):
         player_name = qs
         break
 
-    # Fallback name extraction if no quotes matched a valid name
     if not player_name:
         match_raw = re.search(r'^([a-zA-Z0-9_\-\s]+)\s+(?:joined|left|connected|disconnected)', line, re.IGNORECASE)
         if match_raw:
@@ -185,7 +176,6 @@ def parse_secure_log_line(line: str):
     if not player_name:
         return None, None, None
 
-    # Classify event type
     if "chat:" in lower_line or ":global]" in lower_line or ":local]" in lower_line or ":guild]" in lower_line or "[admin]" in lower_line:
         parts = line.split("]: ")
         message = parts[-1].strip() if len(parts) > 1 else line.split(":")[-1].strip()
@@ -329,7 +319,7 @@ class ShopPaginator(discord.ui.View):
         else: await interaction.response.defer()
 
 # -------------------------------------------------------------
-# 7. Discord Commands
+# 7. Discord Commands & Event Listeners
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -339,6 +329,30 @@ async def on_ready():
         bot.tasks_started = True
         bot.loop.create_task(sftp_chat_listener_loop())
         bot.loop.create_task(playtime_reward_loop())
+
+@bot.event
+async def on_message(message):
+    # Ignore messages from bots or messages not sent in the designated chat channel
+    if message.author.bot or message.channel.id != DISCORD_CHAT_CHANNEL_ID:
+        await bot.process_commands(message)
+        return
+
+    # Ignore bot commands (messages starting with the prefix like '!buy')
+    if message.content.startswith(BOT_PREFIX):
+        await bot.process_commands(message)
+        return
+
+    # Broadcast Discord message into the Palworld server via RCON
+    if SFTP_HOST and ADMIN_PASSWORD:
+        try:
+            chat_text = f"[Discord] {message.author.display_name}: {message.content}"
+            async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+                await rcon.send(f"Broadcast {chat_text}")
+        except Exception as e:
+            logger.error(f"Failed to relay Discord message to game server: {e}")
+
+    # Ensure other bot commands still work properly
+    await bot.process_commands(message)
 
 @bot.command(name="players")
 async def list_players(ctx):
