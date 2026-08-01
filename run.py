@@ -43,73 +43,96 @@ DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
 
 # -------------------------------------------------------------
-# 2. Economy & Categorized Full Shop Catalog
+# 2. Economy & Categorized Full Shop Catalog (Legit Items, -75% Total Discount)
 # -------------------------------------------------------------
 DAILY_REWARD_AMOUNT = 500
 
 SHOP_ITEMS = {
     # === SPHERES ===
-    "palsphere": {"name": "Pal Sphere", "rcon_id": "PalSphere", "price": 100, "category": "Spheres"},
-    "megasphere": {"name": "Mega Sphere", "rcon_id": "PalSphere_Mega", "price": 300, "category": "Spheres"},
-    "gigasphere": {"name": "Giga Sphere", "rcon_id": "PalSphere_Giga", "price": 800, "category": "Spheres"},
-    "hypersphere": {"name": "Hyper Sphere", "rcon_id": "PalSphere_Master", "price": 1500, "category": "Spheres"},
-    "ultrasphere": {"name": "Ultra Sphere", "rcon_id": "PalSphere_Exotic", "price": 3000, "category": "Spheres"},
-    "legendarysphere": {"name": "Legendary Sphere", "rcon_id": "PalSphere_Legend", "price": 5000, "category": "Spheres"},
+    "palsphere": {"name": "Pal Sphere", "rcon_id": "PalSphere", "price": 25, "category": "Spheres"},
+    "megasphere": {"name": "Mega Sphere", "rcon_id": "PalSphere_Mega", "price": 75, "category": "Spheres"},
+    "gigasphere": {"name": "Giga Sphere", "rcon_id": "PalSphere_Giga", "price": 200, "category": "Spheres"},
+    "hypersphere": {"name": "Hyper Sphere", "rcon_id": "PalSphere_Master", "price": 375, "category": "Spheres"},
+    "ultrasphere": {"name": "Ultra Sphere", "rcon_id": "PalSphere_Exotic", "price": 750, "category": "Spheres"},
+    "legendarysphere": {"name": "Legendary Sphere", "rcon_id": "PalSphere_Legend", "price": 1250, "category": "Spheres"},
 
     # === BASIC MATERIALS ===
-    "wood": {"name": "Wood", "rcon_id": "Wood", "price": 10, "category": "Basic Materials"},
-    "stone": {"name": "Stone", "rcon_id": "Stone", "price": 10, "category": "Basic Materials"},
-    "fiber": {"name": "Fiber", "rcon_id": "Fiber", "price": 10, "category": "Basic Materials"},
-    "paldium": {"name": "Paldium Fragment", "rcon_id": "Pal_crystal", "price": 20, "category": "Basic Materials"},
-    "leather": {"name": "Leather", "rcon_id": "Leather", "price": 50, "category": "Basic Materials"},
-    "bone": {"name": "Bone", "rcon_id": "Bone", "price": 50, "category": "Basic Materials"},
-    "horn": {"name": "Horn", "rcon_id": "Horn", "price": 50, "category": "Basic Materials"},
-    "wool": {"name": "Wool", "rcon_id": "Wool", "price": 20, "category": "Basic Materials"},
-    "palfluids": {"name": "Pal Fluids", "rcon_id": "PalFluid", "price": 100, "category": "Basic Materials"},
-    "paloil": {"name": "High Quality Pal Oil", "rcon_id": "PalOil", "price": 150, "category": "Basic Materials"},
-    "flameorgan": {"name": "Flame Organ", "rcon_id": "FireOrgan", "price": 100, "category": "Basic Materials"},
-    "iceorgan": {"name": "Ice Organ", "rcon_id": "IceOrgan", "price": 100, "category": "Basic Materials"},
-    "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 100, "category": "Basic Materials"},
-    "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 100, "category": "Basic Materials"},
+    "wood": {"name": "Wood", "rcon_id": "Wood", "price": 1, "category": "Basic Materials"},
+    "stone": {"name": "Stone", "rcon_id": "Stone", "price": 1, "category": "Basic Materials"},
+    "fiber": {"name": "Fiber", "rcon_id": "Fiber", "price": 2, "category": "Basic Materials"},
+    "paldium": {"name": "Paldium Fragment", "rcon_id": "Pal_crystal", "price": 5, "category": "Basic Materials"},
+    "leather": {"name": "Leather", "rcon_id": "Leather", "price": 12, "category": "Basic Materials"},
+    "bone": {"name": "Bone", "rcon_id": "Bone", "price": 12, "category": "Basic Materials"},
+    "horn": {"name": "Horn", "rcon_id": "Horn", "price": 12, "category": "Basic Materials"},
+    "wool": {"name": "Wool", "rcon_id": "Wool", "price": 5, "category": "Basic Materials"},
+    "palfluids": {"name": "Pal Fluids", "rcon_id": "PalFluid", "price": 25, "category": "Basic Materials"},
+    "paloil": {"name": "High Quality Pal Oil", "rcon_id": "PalOil", "price": 38, "category": "Basic Materials"},
+    "flameorgan": {"name": "Flame Organ", "rcon_id": "FireOrgan", "price": 25, "category": "Basic Materials"},
+    "iceorgan": {"name": "Ice Organ", "rcon_id": "IceOrgan", "price": 25, "category": "Basic Materials"},
+    "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 25, "category": "Basic Materials"},
+    "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 25, "category": "Basic Materials"},
 
     # === ORES & INGOTS ===
-    "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 50, "category": "Ores & Ingots"},
-    "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 100, "category": "Ores & Ingots"},
-    "coal": {"name": "Coal", "rcon_id": "Coal", "price": 100, "category": "Ores & Ingots"},
-    "refinedingot": {"name": "Refined Ingot", "rcon_id": "IronIngot", "price": 250, "category": "Ores & Ingots"},
-    "sulfur": {"name": "Sulfur", "rcon_id": "Sulfur", "price": 150, "category": "Ores & Ingots"},
-    "quartz": {"name": "Pure Quartz", "rcon_id": "Quartz", "price": 200, "category": "Ores & Ingots"},
-    "palmetal": {"name": "Pal Metal Ingot", "rcon_id": "StealIngot", "price": 500, "category": "Ores & Ingots"},
+    "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 12, "category": "Ores & Ingots"},
+    "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 25, "category": "Ores & Ingots"},
+    "coal": {"name": "Coal", "rcon_id": "Coal", "price": 25, "category": "Ores & Ingots"},
+    "refinedingot": {"name": "Refined Ingot", "rcon_id": "IronIngot", "price": 62, "category": "Ores & Ingots"},
+    "sulfur": {"name": "Sulfur", "rcon_id": "Sulfur", "price": 38, "category": "Ores & Ingots"},
+    "quartz": {"name": "Pure Quartz", "rcon_id": "Quartz", "price": 50, "category": "Ores & Ingots"},
+    "palmetal": {"name": "Pal Metal Ingot", "rcon_id": "StealIngot", "price": 125, "category": "Ores & Ingots"},
 
     # === ADVANCED MATERIALS ===
-    "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 300, "category": "Advanced Materials"},
-    "carbonfiber": {"name": "Carbon Fiber", "rcon_id": "CarbonFiber", "price": 400, "category": "Advanced Materials"},
-    "cement": {"name": "Cement", "rcon_id": "Cement", "price": 150, "category": "Advanced Materials"},
-    "circuitboard": {"name": "Circuit Board", "rcon_id": "MachinePart", "price": 500, "category": "Advanced Materials"},
+    "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 75, "category": "Advanced Materials"},
+    "carbonfiber": {"name": "Carbon Fiber", "rcon_id": "CarbonFiber", "price": 100, "category": "Advanced Materials"},
+    "cement": {"name": "Cement", "rcon_id": "Cement", "price": 38, "category": "Advanced Materials"},
+    "circuitboard": {"name": "Circuit Board", "rcon_id": "MachinePart", "price": 125, "category": "Advanced Materials"},
+    "aicore": {"name": "AI Core", "rcon_id": "AIcore", "price": 500, "category": "Advanced Materials"},
 
     # === AMMUNITION ===
-    "arrow": {"name": "Arrow", "rcon_id": "Arrow", "price": 10, "category": "Ammunition"},
-    "firearrow": {"name": "Fire Arrow", "rcon_id": "FireArrow", "price": 20, "category": "Ammunition"},
-    "poisonarrow": {"name": "Poison Arrow", "rcon_id": "PoisonArrow", "price": 20, "category": "Ammunition"},
-    "coarseammo": {"name": "Coarse Ammo", "rcon_id": "RoughBullet", "price": 30, "category": "Ammunition"},
-    "handgunammo": {"name": "Handgun Ammo", "rcon_id": "HandgunBullet", "price": 50, "category": "Ammunition"},
-    "rifleammo": {"name": "Rifle Ammo", "rcon_id": "RifleBullet", "price": 100, "category": "Ammunition"},
-    "shotgunammo": {"name": "Shotgun Shells", "rcon_id": "ShotgunBullet", "price": 120, "category": "Ammunition"},
-    "assaultammo": {"name": "Assault Rifle Ammo", "rcon_id": "AssaultRifleBullet", "price": 150, "category": "Ammunition"},
-    "rocketammo": {"name": "Rocket Ammo", "rcon_id": "ExplosiveBullet", "price": 1000, "category": "Ammunition"},
+    "arrow": {"name": "Arrow", "rcon_id": "Arrow", "price": 2, "category": "Ammunition"},
+    "firearrow": {"name": "Fire Arrow", "rcon_id": "FireArrow", "price": 5, "category": "Ammunition"},
+    "poisonarrow": {"name": "Poison Arrow", "rcon_id": "PoisonArrow", "price": 5, "category": "Ammunition"},
+    "coarseammo": {"name": "Coarse Ammo", "rcon_id": "RoughBullet", "price": 7, "category": "Ammunition"},
+    "handgunammo": {"name": "Handgun Ammo", "rcon_id": "HandgunBullet", "price": 12, "category": "Ammunition"},
+    "rifleammo": {"name": "Rifle Ammo", "rcon_id": "RifleBullet", "price": 25, "category": "Ammunition"},
+    "shotgunammo": {"name": "Shotgun Shells", "rcon_id": "ShotgunBullet", "price": 30, "category": "Ammunition"},
+    "assaultammo": {"name": "Assault Rifle Ammo", "rcon_id": "AssaultRifleBullet", "price": 38, "category": "Ammunition"},
+    "rocketammo": {"name": "Rocket Ammo", "rcon_id": "ExplosiveBullet", "price": 250, "category": "Ammunition"},
+    "energycartridge": {"name": "Energy Cartridge", "rcon_id": "EnergyCartridge", "price": 50, "category": "Ammunition"},
 
-    # === MEDICINE ===
-    "lowmeds": {"name": "Low Grade Medical Supplies", "rcon_id": "Herb", "price": 200, "category": "Medicine"},
-    "meds": {"name": "Medical Supplies", "rcon_id": "Medicines", "price": 500, "category": "Medicine"},
-    "highmeds": {"name": "High Grade Medical Supplies", "rcon_id": "LuxuryMedicines", "price": 1000, "category": "Medicine"},
+    # === WEAPONS ===
+    "oldbow": {"name": "Old Bow", "rcon_id": "OldBow", "price": 125, "category": "Weapons"},
+    "crossbow": {"name": "Crossbow", "rcon_id": "Crossbow", "price": 375, "category": "Weapons"},
+    "handgun": {"name": "Handgun", "rcon_id": "Handgun", "price": 1250, "category": "Weapons"},
+    "singleshotrifle": {"name": "Single-shot Rifle", "rcon_id": "Rifle", "price": 2000, "category": "Weapons"},
+    "assaultrifle": {"name": "Assault Rifle", "rcon_id": "AssaultRifle", "price": 5000, "category": "Weapons"},
+    "pumpactionshotgun": {"name": "Pump-action Shotgun", "rcon_id": "PumpActionShotgun", "price": 6250, "category": "Weapons"},
+    "rocketlauncher": {"name": "Rocket Launcher", "rcon_id": "RocketLauncher", "price": 18750, "category": "Weapons"},
 
-    # === FOOD ===
-    "berries": {"name": "Red Berries", "rcon_id": "Berry", "price": 10, "category": "Food"},
-    "egg": {"name": "Egg", "rcon_id": "Egg", "price": 30, "category": "Food"},
-    "milk": {"name": "Milk", "rcon_id": "Milk", "price": 50, "category": "Food"},
-    "wheat": {"name": "Wheat", "rcon_id": "Wheat", "price": 20, "category": "Food"},
-    "bread": {"name": "Bread", "rcon_id": "Bread", "price": 100, "category": "Food"},
-    "honey": {"name": "Honey", "rcon_id": "Honey", "price": 100, "category": "Food"}
+    # === ARMOR & SHIELDS ===
+    "clotharmor": {"name": "Cloth Armor", "rcon_id": "ClothArmor", "price": 100, "category": "Armor & Shields"},
+    "peltarmor": {"name": "Pelt Armor", "rcon_id": "PeltArmor", "price": 300, "category": "Armor & Shields"},
+    "metalarmor": {"name": "Metal Armor", "rcon_id": "MetalArmor", "price": 1250, "category": "Armor & Shields"},
+    "refinedmetalarmor": {"name": "Refined Metal Armor", "rcon_id": "RefinedMetalArmor", "price": 5000, "category": "Armor & Shields"},
+    "palmetalarmor": {"name": "Pal Metal Armor", "rcon_id": "PalMetalArmor", "price": 20000, "category": "Armor & Shields"},
+    "megashield": {"name": "Mega Shield", "rcon_id": "MegaShield", "price": 750, "category": "Armor & Shields"},
+    "gigashield": {"name": "Giga Shield", "rcon_id": "GigaShield", "price": 2500, "category": "Armor & Shields"},
+    "hypershield": {"name": "Hyper Shield", "rcon_id": "HyperShield", "price": 7500, "category": "Armor & Shields"},
+
+    # === MEDICINE & CONSUMABLES ===
+    "lowmeds": {"name": "Low Grade Medical Supplies", "rcon_id": "Herb", "price": 50, "category": "Medicine & Consumables"},
+    "meds": {"name": "Medical Supplies", "rcon_id": "Medicines", "price": 125, "category": "Medicine & Consumables"},
+    "highmeds": {"name": "High Grade Medical Supplies", "rcon_id": "LuxuryMedicines", "price": 250, "category": "Medicine & Consumables"},
+    "memorywipe": {"name": "Memory Wiping Medicine", "rcon_id": "MemoryWipeMedicine", "price": 2500, "category": "Medicine & Consumables"},
+    "berries": {"name": "Red Berries", "rcon_id": "Berry", "price": 2, "category": "Medicine & Consumables"},
+    "bread": {"name": "Bread", "rcon_id": "Bread", "price": 25, "category": "Medicine & Consumables"},
+    "honey": {"name": "Honey", "rcon_id": "Honey", "price": 25, "category": "Medicine & Consumables"},
+
+    # === VALUABLES ===
+    "ruby": {"name": "Ruby", "rcon_id": "Ruby", "price": 1250, "category": "Valuables"},
+    "sapphire": {"name": "Sapphire", "rcon_id": "Sapphire", "price": 3000, "category": "Valuables"},
+    "emerald": {"name": "Emerald", "rcon_id": "Emerald", "price": 6250, "category": "Valuables"},
+    "diamond": {"name": "Diamond", "rcon_id": "Diamond", "price": 12500, "category": "Valuables"}
 }
 
 async def init_db():
