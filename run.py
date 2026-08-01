@@ -138,14 +138,16 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
     
     try:
         async with aiohttp.ClientSession(auth=auth) as session:
-            if method == "GET":
-                async with session.get(url, timeout=10) as response:
-                    if response.status == 200: return await response.json(), None
-                    else: return None, f"HTTP {response.status}"
-            elif method == "POST":
-                async with session.post(url, json=payload, timeout=10) as response:
-                    if response.status == 200: return await response.json(), None
-                    else: return None, f"HTTP {response.status}"
+            async with session.request(method, url, json=payload, timeout=10) as response:
+                if response.status == 200:
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        return await response.json(), None
+                    else:
+                        text = await response.text()
+                        return {"text": text}, None
+                else:
+                    return None, f"HTTP {response.status}"
     except Exception as e:
         return None, str(e)
 
