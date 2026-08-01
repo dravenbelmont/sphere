@@ -10,6 +10,7 @@ from discord.ext import commands
 import asyncpg
 import aiohttp
 from gamercon_async import GameRCON
+import paramiko
 
 # -------------------------------------------------------------
 # 1. Logging Setup
@@ -37,6 +38,14 @@ RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
 
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
+
+# SFTP Credentials for reading Pal Defender logs from the game server
+SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip().strip("[]()").strip()
+_sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
+SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
+SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
+SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
+PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
 # 3. Daily Login Pack & Shop Items
@@ -116,7 +125,80 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Automated Login Daily Reward & Player Tracking Loop
+# 7. Pal Defender SFTP Log Poller (Picks up fresh log files on reset)
+# -------------------------------------------------------------
+async def poll_paldefender_logs_loop():
+    await bot.wait_until_ready()
+    if not SFTP_HOST or not SFTP_USER:
+        logger.info("⚠️ SFTP credentials not provided. Pal Defender SFTP log polling disabled.")
+        return
+
+    logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    last_file_name = None
+    last_file_size = 0
+
+    while not bot.is_closed():
+        try:
+            def check_logs():
+                nonlocal last_file_name, last_file_size
+                transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+                transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
+                sftp = paramiko.SFTPClient.from_transport(transport)
+                
+                try:
+                    files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
+                    # Filter for log files
+                    log_files = [f for f in files if f.filename.endswith(('.log', '.txt'))]
+                    if not log_files:
+                        sftp.close()
+                        transport.close()
+                        return []
+
+                    # Sort by modification time to find the newest log file generated after restart
+                    log_files.sort(key=lambda x: x.st_mtime, reverse=True)
+                    latest_file = log_files[0]
+                    current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
+
+                    new_lines = []
+                    if last_file_name != latest_file.filename:
+                        # New log file generated (e.g. server restart)
+                        logger.info(f"🔄 New Pal Defender log file detected: {latest_file.filename}")
+                        last_file_name = latest_file.filename
+                        last_file_size = latest_file.st_size
+                    elif latest_file.st_size > last_file_size:
+                        # File has new content
+                        with sftp.open(current_file_path, 'r') as f:
+                            f.seek(last_file_size)
+                            content = f.read().decode('utf-8', errors='ignore')
+                            if content:
+                                new_lines = content.splitlines()
+                        last_file_size = latest_file.st_size
+
+                    sftp.close()
+                    transport.close()
+                    return new_lines
+                except Exception as e:
+                    sftp.close()
+                    transport.close()
+                    raise e
+
+            new_lines = await asyncio.to_thread(check_logs)
+            channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
+
+            if channel and new_lines:
+                for line in new_lines:
+                    line_str = line.strip()
+                    if line_str:
+                        # Format and relay chat lines extracted from Pal Defender logs
+                        await channel.send(f"💬 {line_str}")
+
+        except Exception as e:
+            logger.error(f"SFTP Log Polling Error: {e}")
+
+        await asyncio.sleep(3)
+
+# -------------------------------------------------------------
+# 8. Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
@@ -223,70 +305,20 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 8. Robust Webhook Handler for Pal Defender ➔ Discord Chat
+# 9. Webhook Fallback Handler
 # -------------------------------------------------------------
 async def handle_chat_webhook(request):
     try:
-        content_type = request.headers.get("Content-Type", "")
         raw_body = await request.text()
-        logger.info(f"📥 Received Webhook Content-Type: {content_type} | Raw Body: {raw_body}")
-        
-        data = {}
-        if "application/json" in content_type:
-            try:
-                data = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                data = {"message": raw_body}
-        elif "form" in content_type:
-            post = await request.post()
-            data = dict(post)
-        else:
-            try:
-                data = json.loads(raw_body) if raw_body else {"message": raw_body}
-            except Exception:
-                data = {"message": raw_body}
-
-        if isinstance(data, str):
-            data = {"message": data}
-
-        name = (
-            data.get("name") or 
-            data.get("username") or 
-            data.get("player") or 
-            data.get("sender") or 
-            data.get("player_name") or 
-            data.get("author") or
-            "In-Game Player"
-        )
-        message = (
-            data.get("message") or 
-            data.get("content") or 
-            data.get("text") or 
-            data.get("msg") or 
-            raw_body or 
-            ""
-        )
-        
-        # Clean up nested json strings if passed as a string message
-        if isinstance(message, str) and message.startswith("{") and message.endswith("}"):
-            try:
-                parsed_msg = json.loads(message)
-                message = parsed_msg.get("message") or parsed_msg.get("content") or message
-                name = parsed_msg.get("name") or parsed_msg.get("player") or name
-            except Exception:
-                pass
-
         channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
-        if channel and message:
-            await channel.send(f"💬 **{name}**: {message}")
-            
+        if channel and raw_body:
+            await channel.send(f"💬 {raw_body}")
         return web.Response(text="OK", status=200)
     except Exception as e:
-        logger.error(f"❌ Error processing incoming game chat webhook: {e}", exc_info=True)
         return web.Response(text="OK", status=200)
 
 # -------------------------------------------------------------
-# 9. Discord Commands & Event Listeners
+# 10. Discord Commands & Event Listeners
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -295,6 +327,7 @@ async def on_ready():
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
+        bot.loop.create_task(poll_paldefender_logs_loop())
 
 @bot.event
 async def on_message(message):
@@ -337,7 +370,7 @@ async def givedaily(ctx, account_id: str):
         await ctx.send(f"❌ Failed to send items: {e}")
 
 # -------------------------------------------------------------
-# 10. Web Server & Main Execution
+# 11. Web Server & Main Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
