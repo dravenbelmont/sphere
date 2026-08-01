@@ -186,7 +186,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. SFTP Chat Listener (Multi-Log Directory Scanner)
+# 5. SFTP Chat Listener
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
@@ -240,7 +240,60 @@ async def sftp_chat_listener_loop():
         await asyncio.sleep(3)
 
 # -------------------------------------------------------------
-# 6. Discord Events & Standard Commands
+# 6. Shop Pagination View UI
+# -------------------------------------------------------------
+class ShopPaginator(discord.ui.View):
+    def __init__(self, items_list, author_id):
+        super().__init__(timeout=180)
+        self.items = items_list
+        self.author_id = author_id
+        self.current_page = 0
+        self.per_page = 8  # Keep fields safe under Discord limits
+        self.max_pages = (len(items_list) - 1) // self.per_page
+
+    def get_embed(self):
+        embed = discord.Embed(
+            title="🛒 Palworld Server Shop",
+            description="Use `!buy <item_id> <quantity>` to purchase items directly in-game!",
+            color=discord.Color.blue()
+        )
+        
+        start = self.current_page * self.per_page
+        end = start + self.per_page
+        page_items = self.items[start:end]
+
+        for item_id, data in page_items:
+            embed.add_field(
+                name=f"{data['name']} (`{item_id}`)",
+                value=f"Category: **{data['category']}**\nPrice: 🪙 **{data['price']} coins**",
+                inline=False
+            )
+
+        embed.set_footer(text=f"Page {self.current_page + 1} of {self.max_pages + 1} | Use !buy <item_id> <quantity>")
+        return embed
+
+    @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.primary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            return await interaction.response.send_message("This isn't your shop menu!", ephemeral=True)
+        if self.current_page > 0:
+            self.current_page -= 1
+            await interaction.response.edit_message(embed=self.get_embed(), view=self)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.primary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            return await interaction.response.send_message("This isn't your shop menu!", ephemeral=True)
+        if self.current_page < self.max_pages:
+            self.current_page += 1
+            await interaction.response.edit_message(embed=self.get_embed(), view=self)
+        else:
+            await interaction.response.defer()
+
+# -------------------------------------------------------------
+# 7. Discord Events & Standard Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -265,9 +318,6 @@ async def list_players(ctx):
     embed = discord.Embed(title=f"Online Players ({len(players)})", description=player_list, color=discord.Color.blue())
     await ctx.send(embed=embed)
 
-# -------------------------------------------------------------
-# 7. Economy & Shop Commands
-# -------------------------------------------------------------
 @bot.command(name="register")
 async def register(ctx, player_uid: str):
     if not DATABASE_URL: return
@@ -286,7 +336,6 @@ async def register(ctx, player_uid: str):
 
 @bot.command(name="daily")
 async def daily(ctx):
-    """Claim your daily Discord coins to use in the shop."""
     if not DATABASE_URL: return
     conn = await asyncpg.connect(DATABASE_URL)
     try:
@@ -307,7 +356,7 @@ async def daily(ctx):
 
         new_balance = balance + DAILY_REWARD_AMOUNT
         await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', new_balance, now, ctx.author.id)
-        await ctx.send(f"💰 You claimed your daily reward of **{DAILY_REWARD_AMOUNT} coins**! Use `!shop` to see what you can buy.\n💳 **New balance:** {new_balance} coins.")
+        await ctx.send(f"💰 You claimed your daily reward of **{DAILY_REWARD_AMOUNT} coins**! Use `!shop` to browse items.\n💳 **New balance:** {new_balance} coins.")
     finally:
         await conn.close()
 
@@ -324,30 +373,13 @@ async def balance(ctx):
 
 @bot.command(name="shop")
 async def shop(ctx):
-    """Displays categorized items available for purchase."""
-    embed = discord.Embed(
-        title="🛒 Palworld Server Shop",
-        description="Use `!buy <item_id> <quantity>` to have items delivered directly in-game!",
-        color=discord.Color.blue()
-    )
-
-    categories = {}
-    for item_id, item_data in SHOP_ITEMS.items():
-        cat = item_data.get("category", "Other")
-        if cat not in categories:
-            categories[cat] = []
-        categories[cat].append(f"`{item_id}` - {item_data['name']} (🪙 {item_data['price']})")
-
-    for cat, items in categories.items():
-        field_value = "\n".join(items)
-        embed.add_field(name=f"**{cat}**", value=field_value, inline=False)
-
-    embed.set_footer(text="Use !buy <item_id> <quantity> to purchase!")
-    await ctx.send(embed=embed)
+    """Displays items available for purchase with interactive pagination buttons."""
+    items_list = list(SHOP_ITEMS.items())
+    view = ShopPaginator(items_list, ctx.author.id)
+    await ctx.send(embed=view.get_embed(), view=view)
 
 @bot.command(name="buy")
 async def buy(ctx, item_key: str, quantity: int = 1):
-    """Buy items and deposit them directly in-game via RCON."""
     if not DATABASE_URL: return
 
     item_key = item_key.lower()
@@ -374,7 +406,6 @@ async def buy(ctx, item_key: str, quantity: int = 1):
             await ctx.send(f"❌ Not enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
             return
 
-        # 1. Attempt to give the item in-game via RCON
         try:
             async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
                 rcon_command = f"give {player_uid} {item['rcon_id']} {quantity}"
@@ -385,7 +416,6 @@ async def buy(ctx, item_key: str, quantity: int = 1):
             await ctx.send(f"❌ **Delivery Failed:** Could not connect to the game server via RCON. Your coins were **not** deducted.")
             return
 
-        # 2. Deduct balance upon successful RCON transmission
         new_balance = current_balance - total_cost
         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
         
