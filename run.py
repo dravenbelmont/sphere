@@ -141,6 +141,10 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200: return await response.json(), None
                     else: return None, f"HTTP {response.status}"
+            elif method == "POST":
+                async with session.post(url, json=payload, timeout=10) as response:
+                    if response.status == 200: return await response.json(), None
+                    else: return None, f"HTTP {response.status}"
     except Exception as e:
         return None, str(e)
 
@@ -342,15 +346,13 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # Broadcast Discord message into the Palworld server via RCON
-    # Palworld requires spaces to be replaced with underscores (_) so messages don't get cut off.
-    if SFTP_HOST and ADMIN_PASSWORD:
+    # Broadcast Discord message into the Palworld server via the REST API (/announce endpoint)
+    if REST_API_URL and ADMIN_PASSWORD:
         try:
-            display_name = message.author.display_name.replace(" ", "_")
-            content = message.content.replace(" ", "_")
-            chat_text = f"[Discord]_{display_name}:_{content}"
-            async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-                await rcon.send(f"Broadcast {chat_text}")
+            chat_text = f"[Discord] {message.author.display_name}: {message.content}"
+            _, error = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
+            if error:
+                logger.error(f"Failed to relay message via REST API: {error}")
         except Exception as e:
             logger.error(f"Failed to relay Discord message to game server: {e}")
 
