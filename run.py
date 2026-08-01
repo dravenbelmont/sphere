@@ -123,7 +123,8 @@ known_online_players = set()
 last_known_player_names = {}
 is_players_initialized = False
 
-async def process_login_daily(player_uid: str, player_name: str):
+# FIX: Now accepts account_id (Steam ID) to properly issue RCON 'give' commands
+async def process_login_daily(player_uid: str, player_name: str, account_id: str):
     if not DATABASE_URL or not RCON_HOST:
         return
     
@@ -150,7 +151,8 @@ async def process_login_daily(player_uid: str, player_name: str):
 
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
+                # FIX: Uses account_id (SteamID) instead of the internal player_uid
+                await rcon.send(f"give {account_id} {item['rcon_id']} {item['quantity']}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
     except Exception as e:
@@ -186,7 +188,8 @@ async def poll_palworld_players_loop():
                         known_online_players = current_ids
                         is_players_initialized = True
                         for pid, pdata in current_players_map.items():
-                            asyncio.create_task(process_login_daily(pid, pdata["name"]))
+                            # FIX: Pass the account_id
+                            asyncio.create_task(process_login_daily(pid, pdata["name"], pdata["account_id"]))
                     else:
                         joined_ids = current_ids - known_online_players
                         left_ids = known_online_players - current_ids
@@ -197,7 +200,8 @@ async def poll_palworld_players_loop():
                             account_id = pdata["account_id"]
                             
                             logger.info(f"Player join detected: {name} (ID: {account_id})")
-                            asyncio.create_task(process_login_daily(jid, name))
+                            # FIX: Pass the account_id
+                            asyncio.create_task(process_login_daily(jid, name, account_id))
 
                             if channel:
                                 embed = discord.Embed(
@@ -257,20 +261,16 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    # Process standard commands first
     await bot.process_commands(message)
     
-    # Ignore bot messages
     if message.author.bot:
         return
         
-    # Discord ➔ Game Chat Relay
     if DISCORD_CHAT_CHANNEL_ID != 0 and message.channel.id == DISCORD_CHAT_CHANNEL_ID:
         if not message.content.startswith(BOT_PREFIX):
             if REST_API_URL and ADMIN_PASSWORD:
                 try:
                     clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
-                    # Clean format: Just Discord name and message
                     chat_text = f"[{message.author.display_name}] {clean_msg}"
                     
                     _, error = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
@@ -279,7 +279,7 @@ async def on_message(message):
                 except Exception as e:
                     logger.error(f"Failed to relay Discord message to game server: {e}")
 
-# Basic Shop Commands
+# Basic Shop Command
 @bot.command(name="shop")
 async def shop(ctx):
     embed = discord.Embed(title="Palworld Shop", color=discord.Color.blue())
@@ -287,16 +287,26 @@ async def shop(ctx):
         embed.add_field(name=item_info['name'], value=f"Cost: {item_info['price']} points\nID: `{item_key}`", inline=False)
     await ctx.send(embed=embed)
 
+# NEW: Manual Daily Reward Command
+@bot.command(name="givedaily")
+@commands.has_permissions(administrator=True)
+async def givedaily(ctx, account_id: str):
+    """Manually gives the daily reward pack to a specific Steam/Console ID."""
+    try:
+        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            for item in DAILY_PACK_ITEMS:
+                await rcon.send(f"give {account_id} {item['rcon_id']} {item['quantity']}")
+            
+        await ctx.send(f"✅ Successfully sent the daily pack to Steam/Console ID: `{account_id}`")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send items: {e}")
+
 # -------------------------------------------------------------
 # 10. Web Server & Main Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
-    
-    # Basic health check route
     app.router.add_get("/", lambda r: web.Response(text="OK"))
-    
-    # Listen for Game -> Discord Webhooks (matches standard mod configs)
     app.router.add_post("/webhook", handle_chat_webhook)
     
     runner = web.AppRunner(app)
