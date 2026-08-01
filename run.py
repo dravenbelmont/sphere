@@ -27,7 +27,7 @@ logger = logging.getLogger("PalBot")
 # -------------------------------------------------------------
 DISCORD_TOKEN = (os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN") or "").strip().strip("[]()").strip()
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
-REST_API_URL = (os.getenv("REST_API_URL") or "").strip().strip("[]()").strip()
+REST_API_URL = (os.getenv("REST_API_URL") or os.getenv("PALWORLD_API_URL") or "").strip().strip("[]()").strip()
 ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or os.getenv("RCON_PASSWORD") or "").strip().strip("[]()").strip()
 WEB_PORT = int(os.getenv("PORT", "10000"))
 DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_URL") or "").strip().strip("[]()").strip()
@@ -149,117 +149,64 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Strict Zero-IP Log Parser & Persistent SFTP Loop
+# 5. REST API Player Tracking Loop (Joins & Leaves)
 # -------------------------------------------------------------
-last_position = 0 
-last_file_name = None
+known_online_players = set()
+last_known_player_names = {}
+is_players_initialized = False
 
-def parse_secure_log_line(line: str):
-    lower_line = line.lower()
-
-    userid_match = re.search(r"(?:UserId|UID|SteamId)=([^\s,\)]+)", line, re.IGNORECASE)
-    steam_id = userid_match.group(1) if userid_match else None
-
-    quoted_strings = re.findall(r"['\"]([^'\"]+)['\"]", line)
-    player_name = None
-    for qs in quoted_strings:
-        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', qs):
-            continue
-        if re.match(r'^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}', qs):
-            continue
-        player_name = qs
-        break
-
-    if not player_name:
-        match_raw = re.search(r'^([a-zA-Z0-9_\-\s]+)\s+(?:joined|left|connected|disconnected)', line, re.IGNORECASE)
-        if match_raw:
-            candidate = match_raw.group(1).strip()
-            if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', candidate):
-                player_name = candidate
-
-    if not player_name:
-        return None, None, None
-
-    if "chat:" in lower_line or ":global]" in lower_line or ":local]" in lower_line or ":guild]" in lower_line or "[admin]" in lower_line:
-        parts = line.split("]: ")
-        message = parts[-1].strip() if len(parts) > 1 else line.split(":")[-1].strip()
-        message = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[REDACTED]', message)
-        return "CHAT", player_name, message
-
-    elif any(kw in lower_line for kw in ["join", "connected", "login", "spawn", "connect"]):
-        return "JOIN", player_name, steam_id
-
-    elif any(kw in lower_line for kw in ["leave", "disconnected", "logout", "disconnect", "quit"]):
-        return "LEAVE", player_name, steam_id
-
-    return None, None, None
-
-async def sftp_chat_listener_loop():
-    global last_position, last_file_name
+async def poll_palworld_players_loop():
+    global known_online_players, last_known_player_names, is_players_initialized
     await bot.wait_until_ready()
-    if not DISCORD_CHAT_CHANNEL_ID or not SFTP_USER: return
-    channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
-    if not channel: return
-
-    transport = None
-    sftp = None
-
+    
     while not bot.is_closed():
-        try:
-            if transport is None or not transport.is_active():
-                logger.info("Connecting to SFTP server...")
-                transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-                transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
-                sftp = paramiko.SFTPClient.from_transport(transport)
-                logger.info("SFTP connected successfully.")
+        if DISCORD_CHAT_CHANNEL_ID and REST_API_URL and ADMIN_PASSWORD:
+            try:
+                data, error = await call_palworld_api("/players", method="GET")
+                if not error and data:
+                    players = data.get("players", [])
+                    current_players_map = {}
+                    for p in players:
+                        pid = p.get("userid") or p.get("playeruid") or p.get("name")
+                        pname = p.get("name", "Unknown")
+                        if pid:
+                            current_players_map[str(pid)] = pname
+                            last_known_player_names[str(pid)] = pname
 
-            def scan_logs_persistent(sftp_client):
-                global last_position, last_file_name
-                files = sftp_client.listdir_attr(SFTP_LOG_PATH)
-                log_files = [f for f in files if f.filename.endswith('.log')]
-                if not log_files:
-                    return []
-                    
-                latest_file = sorted(log_files, key=lambda x: x.st_mtime, reverse=True)[0]
-                full_file_path = f"{SFTP_LOG_PATH}/{latest_file.filename}"
+                    current_ids = set(current_players_map.keys())
+                    channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
 
-                if last_file_name != latest_file.filename:
-                    last_file_name = latest_file.filename
-                    last_position = 0 
+                    if not is_players_initialized:
+                        known_online_players = current_ids
+                        is_players_initialized = True
+                    else:
+                        joined_ids = current_ids - known_online_players
+                        left_ids = known_online_players - current_ids
 
-                with sftp_client.open(full_file_path, "r") as f:
-                    f.seek(last_position)
-                    new_data = f.read().decode("utf-8", errors="replace")
-                    last_position = f.tell()
+                        if channel:
+                            for jid in joined_ids:
+                                name = current_players_map.get(jid, "A player")
+                                embed = discord.Embed(
+                                    title="🟢 Player Joined",
+                                    description=f"**{name}** has joined the server!",
+                                    color=discord.Color.green()
+                                )
+                                await channel.send(embed=embed)
 
-                return [line.strip() for line in new_data.splitlines() if line.strip()]
+                            for lid in left_ids:
+                                name = last_known_player_names.get(lid, "A player")
+                                embed = discord.Embed(
+                                    title="🔴 Player Left",
+                                    description=f"**{name}** has left the server.",
+                                    color=discord.Color.red()
+                                )
+                                await channel.send(embed=embed)
 
-            new_lines = await asyncio.to_thread(scan_logs_persistent, sftp)
-            for line in new_lines:
-                event_type, name, data = parse_secure_log_line(line)
-                if event_type == "CHAT":
-                    await channel.send(f"💬 **{name}**: {data}")
-                elif event_type == "JOIN":
-                    id_str = f" (Steam ID: `{data}`)" if data else ""
-                    await channel.send(f"🟢 **{name}** joined the server.{id_str}")
-                elif event_type == "LEAVE":
-                    id_str = f" (Steam ID: `{data}`)" if data else ""
-                    await channel.send(f"🔴 **{name}** left the server.{id_str}")
-
-        except Exception as e:
-            logger.error(f"SFTP Error / Reconnecting: {e}")
-            if sftp:
-                try: sftp.close()
-                except: pass
-            if transport:
-                try: transport.close()
-                except: pass
-            transport = None
-            sftp = None
-            await asyncio.sleep(5)
-            continue
-            
-        await asyncio.sleep(3)
+                        known_online_players = current_ids
+            except Exception as e:
+                logger.error(f"Player polling loop error: {e}")
+                
+        await asyncio.sleep(5)
 
 async def playtime_reward_loop():
     await bot.wait_until_ready()
@@ -275,9 +222,9 @@ async def playtime_reward_loop():
             conn = await asyncpg.connect(DATABASE_URL)
             try:
                 for p in players:
-                    uid = p.get("playeruid", p.get("userId"))
+                    uid = p.get("playeruid", p.get("userid"))
                     if not uid: continue
-                    row = await conn.fetchrow('SELECT discord_id, balance FROM users WHERE player_uid = $1', uid)
+                    row = await conn.fetchrow('SELECT discord_id, balance FROM users WHERE player_uid = $1', str(uid))
                     if row:
                         new_bal = row['balance'] + PLAYTIME_REWARD_AMOUNT
                         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_bal, row['discord_id'])
@@ -331,22 +278,19 @@ async def on_ready():
     logger.info(f"✅ Bot connected as {bot.user}")
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
-        bot.loop.create_task(sftp_chat_listener_loop())
+        bot.loop.create_task(poll_palworld_players_loop())
         bot.loop.create_task(playtime_reward_loop())
 
 @bot.event
 async def on_message(message):
-    # Ignore messages from bots or messages not sent in the designated chat channel
     if message.author.bot or message.channel.id != DISCORD_CHAT_CHANNEL_ID:
         await bot.process_commands(message)
         return
 
-    # Ignore bot commands (messages starting with the prefix like '!buy')
     if message.content.startswith(BOT_PREFIX):
         await bot.process_commands(message)
         return
 
-    # Broadcast Discord message into the Palworld server via the REST API (/announce endpoint)
     if REST_API_URL and ADMIN_PASSWORD:
         try:
             chat_text = f"[Discord] {message.author.display_name}: {message.content}"
