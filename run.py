@@ -1,5 +1,4 @@
 import asyncio
-import csv
 import logging
 import os
 import sys
@@ -9,6 +8,7 @@ import discord
 from discord.ext import commands
 import paramiko
 import asyncpg
+import aiohttp
 
 # -------------------------------------------------------------
 # Logging Setup
@@ -21,80 +21,42 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 1. Environment & Configuration (Bulletproof Fallbacks)
+# 1. Environment & Configuration
 # -------------------------------------------------------------
 DISCORD_TOKEN = (
     os.getenv("DISCORD_TOKEN")
     or os.getenv("BOT_TOKEN")
-    or os.getenv("DISCORD_BOT_TOKEN")
     or ""
 ).strip()
 
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
 
-RCON_HOST = (
-    os.getenv("RCON_HOST")
-    or os.getenv("SERVER_IP")
-    or "167.114.174.145"
-).strip()
-
+# REST API Configuration (Replaces RCON to bypass Indifferent Broccoli firewall restrictions)
+REST_API_URL = os.getenv("REST_API_URL", "").strip()
 ADMIN_PASSWORD = (
     os.getenv("ADMIN_PASSWORD")
     or os.getenv("RCON_PASSWORD")
-    or os.getenv("SERVER_PASSWORD")
     or ""
 ).strip()
 
-WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "10000")))
+WEB_PORT = int(os.getenv("PORT", "10000"))
 
-DATABASE_URL = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("SUPABASE_URL")
-    or os.getenv("POSTGRES_URL")
-    or ""
-).strip()
+# Supabase Database URL (Pooled connection for IPv4/Render compatibility)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
-SFTP_HOST = (
-    os.getenv("SFTP_HOST")
-    or os.getenv("SFTP_IP")
-    or RCON_HOST
-).strip()
-
+# SFTP Settings (For live chat mirroring)
+SFTP_HOST = os.getenv("SFTP_HOST", "").strip()
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
-
-SFTP_USER = (
-    os.getenv("SFTP_USER")
-    or os.getenv("SFTP_USERNAME")
-    or ""
-).strip()
-
-SFTP_PASSWORD = (
-    os.getenv("SFTP_PASSWORD")
-    or os.getenv("SFTP_PASS")
-    or ""
-).strip()
-
-SFTP_LOG_PATH = (
-    os.getenv("SFTP_LOG_PATH")
-    or os.getenv("LOG_PATH")
-    or "/Pal/Saved/SaveGames/PalDefender/Chat.log"
-).strip()
+SFTP_USER = os.getenv("SFTP_USER", "").strip()
+SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", "").strip()
+SFTP_LOG_PATH = os.getenv("SFTP_LOG_PATH", "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip()
 
 _channel_val = (
     os.getenv("DISCORD_CHAT_CHANNEL_ID")
     or os.getenv("CHANNEL_ID")
-    or os.getenv("DISCORD_CHANNEL_ID")
     or "0"
 ).strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
-
-def get_rcon_port() -> int:
-    port_str = (
-        os.getenv("RCON_PORT")
-        or os.getenv("ADMIN_PORT")
-        or ""
-    ).strip()
-    return int(port_str) if port_str.isdigit() else 25575
 
 # -------------------------------------------------------------
 # 2. Economy & Shop Setup (Supabase / PostgreSQL)
@@ -137,31 +99,43 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 4. RCON Helpers
+# 4. Palworld REST API Helpers
 # -------------------------------------------------------------
-async def send_rcon_command(command: str) -> tuple[str | None, str | None]:
-    if not ADMIN_PASSWORD:
-        return None, "RCON_PASSWORD / ADMIN_PASSWORD missing."
+async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
+    """Communicates with Palworld's native REST API via HTTP Basic Auth."""
+    if not REST_API_URL or not ADMIN_PASSWORD:
+        return None, "REST_API_URL or ADMIN_PASSWORD missing."
+    
+    url = f"{REST_API_URL.rstrip('/')}{endpoint}"
+    auth = aiohttp.BasicAuth("admin", ADMIN_PASSWORD)
+    
     try:
-        from gamercon_async import GameRCON
-        port = get_rcon_port()
-        async with GameRCON(RCON_HOST, port, ADMIN_PASSWORD, timeout=10) as rcon:
-            response = await rcon.send(command)
-            return response.strip(), None
+        async with aiohttp.ClientSession(auth=auth) as session:
+            if method == "GET":
+                async with session.get(url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data, None
+                    else:
+                        text = await response.text()
+                        return None, f"HTTP {response.status}: {text}"
+            elif method == "POST":
+                async with session.post(url, json=payload, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data, None
+                    else:
+                        text = await response.text()
+                        return None, f"HTTP {response.status}: {text}"
     except Exception as e:
-        logger.error(f"RCON Error: {e}")
+        logger.error(f"REST API Error: {e}")
         return None, str(e)
-
-async def broadcast_announcement_rcon(message: str) -> bool:
-    formatted_msg = message.replace(" ", "_")
-    response, error = await send_rcon_command(f"Broadcast {formatted_msg}")
-    return bool(response and not error)
 
 # -------------------------------------------------------------
 # 5. SFTP Chat Listener
 # -------------------------------------------------------------
 def fetch_new_chat_lines(last_offset: int) -> tuple[list[str], int]:
-    if not SFTP_USER or not SFTP_PASSWORD:
+    if not SFTP_USER or not SFTP_PASSWORD or not SFTP_HOST:
         return [], last_offset
     transport = sftp = None
     try:
@@ -219,38 +193,35 @@ async def on_ready():
 
 @bot.command(name="players")
 async def list_players(ctx):
-    raw_response, error = await send_rcon_command("ShowPlayers")
+    data, error = await call_palworld_api("/players", method="GET")
     if error:
         await ctx.send(
-            f"❌ **RCON Connection Error:**\n`{error}`\n\n"
-            "*(Please check your `RCON_PORT` and `RCON_PASSWORD` in Render environment settings.)*"
+            f"❌ **REST API Connection Error:**\n`{error}`\n\n"
+            "*(Please check your `REST_API_URL` and `ADMIN_PASSWORD` in Render environment settings.)*"
         )
         return
-    if not raw_response:
-        await ctx.send("🎮 Server responded, but data was empty.")
+    if not data or "players" not in data:
+        await ctx.send("🎮 Server responded, but player data was empty.")
         return
 
-    players = []
-    lines = [line.strip() for line in raw_response.splitlines() if line.strip()]
-    if len(lines) > 1:
-        reader = csv.DictReader(lines)
-        for row in reader:
-            if row.get("name"):
-                players.append(row)
-
+    players = data["players"]
     if not players:
         await ctx.send("🎮 **Server Status:** 0 players currently online.")
         return
 
-    player_list = "\n".join([f"• **{p['name']}** (UID: `{p['playeruid']}`)" for p in players])
+    player_list = "\n".join([f"• **{p.get('name', 'Unknown')}** (Level {p.get('level', '?')}, UID: `{p.get('playeruid', p.get('userId', 'N/A'))}`)" for p in players])
     embed = discord.Embed(title=f"Online Players ({len(players)})", description=player_list, color=discord.Color.blue())
     await ctx.send(embed=embed)
 
 @bot.command(name="announce")
 @commands.has_permissions(administrator=True)
 async def announce_ingame(ctx, *, message: str):
-    success = await broadcast_announcement_rcon(f"[Discord] {message}")
-    await ctx.send(f"✅ Broadcast sent: **{message}**" if success else "❌ Failed to send broadcast.")
+    payload = {"message": f"[Discord] {message}"}
+    data, error = await call_palworld_api("/announce", method="POST", payload=payload)
+    if error:
+        await ctx.send(f"❌ Failed to send broadcast: `{error}`")
+    else:
+        await ctx.send(f"✅ Broadcast sent: **{message}**")
 
 # -------------------------------------------------------------
 # 7. Economy & Shop Commands (Supabase Backend)
@@ -375,17 +346,10 @@ async def buy(ctx, item_key: str, quantity: int = 1):
             await ctx.send(f"❌ You don't have enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
             return
 
-        rcon_cmd = f"GiveItem {player_uid} {item['id']} {quantity}"
-        resp, error = await send_rcon_command(rcon_cmd)
-
-        if error:
-            await ctx.send(f"❌ Failed to deliver items. RCON Error: `{error}`")
-            return
-            
         new_balance = current_balance - total_cost
         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
         
-        await ctx.send(f"✅ Successfully bought {quantity}x **{item['name']}**! They have been sent to your inventory. Remaining balance: **{new_balance}**.")
+        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**! Deducted **{total_cost} coins**. Remaining balance: **{new_balance}**.\n*(Note: Since Indifferent Broccoli restricts RCON item spawning, please contact an admin or use your coins balance for server rewards!)*")
     except Exception as e:
         logger.error(f"Database error on buy: {e}")
         await ctx.send("❌ An error occurred processing your purchase.")
