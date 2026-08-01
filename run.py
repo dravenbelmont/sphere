@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import re
 import sys
 from datetime import datetime, timedelta
 from aiohttp import web
@@ -38,7 +37,7 @@ _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") 
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 # -------------------------------------------------------------
-# 2. Daily Login Pack & Full Palworld 1.0 Shop Catalog Configuration
+# 2. Daily Login Pack & Comprehensive Palworld 1.0 Shop Catalog
 # -------------------------------------------------------------
 DAILY_PACK_SHOP_POINTS = 1000
 DAILY_PACK_ITEMS = [
@@ -74,10 +73,18 @@ SHOP_ITEMS = {
     "leather": {"name": "Leather", "id": "Leather", "price": 12, "category": "Ores & Materials"},
     "bone": {"name": "Bone", "id": "Bone", "price": 12, "category": "Ores & Materials"},
     "horn": {"name": "Horn", "id": "Horn", "price": 12, "category": "Ores & Materials"},
+    "wool": {"name": "Wool", "id": "Wool", "price": 5, "category": "Ores & Materials"},
+    "cloth": {"name": "Cloth", "id": "Cloth", "price": 10, "category": "Ores & Materials"},
+    "fine_cloth": {"name": "Fine Cloth", "id": "FineCloth", "price": 40, "category": "Ores & Materials"},
+    "pal_fluid": {"name": "Pal Fluid", "id": "PalFluid", "price": 25, "category": "Ores & Materials"},
     "venom_gland": {"name": "Venom Gland", "id": "VenomGland", "price": 25, "category": "Ores & Materials"},
     "electric_organ": {"name": "Electric Organ", "id": "ElectricOrgan", "price": 25, "category": "Ores & Materials"},
     "magma_organ": {"name": "Flame Organ", "id": "FlameOrgan", "price": 25, "category": "Ores & Materials"},
     "ice_organ": {"name": "Ice Organ", "id": "IceOrgan", "price": 25, "category": "Ores & Materials"},
+    "small_pal_soul": {"name": "Small Pal Soul", "id": "PalsSoul_S", "price": 50, "category": "Ores & Materials"},
+    "medium_pal_soul": {"name": "Medium Pal Soul", "id": "PalsSoul_M", "price": 150, "category": "Ores & Materials"},
+    "large_pal_soul": {"name": "Large Pal Soul", "id": "PalsSoul_L", "price": 500, "category": "Ores & Materials"},
+    "ancient_parts": {"name": "Ancient Civilization Parts", "id": "AncientCivilizationParts", "price": 100, "category": "Ores & Materials"},
 
     # Ingots & Advanced Metals
     "ingot": {"name": "Ingot", "id": "Ingot", "price": 25, "category": "Ingots & Metals"},
@@ -89,18 +96,39 @@ SHOP_ITEMS = {
     "polymer": {"name": "Polymer", "id": "Polymer", "price": 75, "category": "Ingots & Metals"},
     "cement": {"name": "Cement", "id": "Cement", "price": 38, "category": "Ingots & Metals"},
 
-    # Weapons & Spears
-    "stone_spear": {"name": "Stone Spear", "id": "Spear", "price": 50, "category": "Weapons & Spears"},
-    "metal_spear": {"name": "Metal Spear", "id": "Spear_Metal", "price": 300, "category": "Weapons & Spears"},
-    "refined_metal_spear": {"name": "Refined Metal Spear", "id": "Spear_RefinedMetal", "price": 800, "category": "Weapons & Spears"},
-    "lilys_spear": {"name": "Lily's Spear", "id": "Spear_ForestBoss", "price": 2500, "category": "Weapons & Spears"},
-    "primitive_sword": {"name": "Primitive Sword", "id": "Sword", "price": 1200, "category": "Weapons & Spears"},
-    "laser_sword": {"name": "Beam Sword", "id": "BeamSword", "price": 4000, "category": "Weapons & Spears"},
-    "assault_rifle": {"name": "Assault Rifle", "id": "AssaultRifle", "price": 6000, "category": "Weapons & Spears"},
-    "rocket_launcher": {"name": "Rocket Launcher", "id": "RocketLauncher", "price": 12000, "category": "Weapons & Spears"},
+    # Weapons
+    "old_bow": {"name": "Old Bow", "id": "OldBow", "price": 30, "category": "Weapons"},
+    "crossbow": {"name": "Crossbow", "id": "Crossbow", "price": 150, "category": "Weapons"},
+    "stone_spear": {"name": "Stone Spear", "id": "Spear", "price": 50, "category": "Weapons"},
+    "metal_spear": {"name": "Metal Spear", "id": "Spear_Metal", "price": 300, "category": "Weapons"},
+    "refined_metal_spear": {"name": "Refined Metal Spear", "id": "Spear_RefinedMetal", "price": 800, "category": "Weapons"},
+    "lilys_spear": {"name": "Lily's Spear", "id": "Spear_ForestBoss", "price": 2500, "category": "Weapons"},
+    "primitive_sword": {"name": "Primitive Sword", "id": "Sword", "price": 1200, "category": "Weapons"},
+    "laser_sword": {"name": "Beam Sword", "id": "BeamSword", "price": 4000, "category": "Weapons"},
+    "handgun": {"name": "Handgun", "id": "Handgun", "price": 2000, "category": "Weapons"},
+    "assault_rifle": {"name": "Assault Rifle", "id": "AssaultRifle", "price": 6000, "category": "Weapons"},
+    "pump_shotgun": {"name": "Pump-action Shotgun", "id": "Shotgun", "price": 8000, "category": "Weapons"},
+    "rocket_launcher": {"name": "Rocket Launcher", "id": "RocketLauncher", "price": 12000, "category": "Weapons"},
+    "flamethrower": {"name": "Flamethrower", "id": "FlameThrower", "price": 10000, "category": "Weapons"},
+    "gatling_gun": {"name": "Gatling Gun", "id": "GatlingGun", "price": 15000, "category": "Weapons"},
+
+    # Armor & Gear
+    "cloth_hat": {"name": "Cloth Hat", "id": "ClothHat", "price": 50, "category": "Armor & Gear"},
+    "fur_helmet": {"name": "Fur Helmet", "id": "FurHelmet", "price": 150, "category": "Armor & Gear"},
+    "metal_helm": {"name": "Metal Helm", "id": "MetalHelmet", "price": 400, "category": "Armor & Gear"},
+    "refined_metal_helm": {"name": "Refined Metal Helm", "id": "RefinedMetalHelmet", "price": 1000, "category": "Armor & Gear"},
+    "pal_metal_helm": {"name": "Pal Metal Helm", "id": "PalMetalHelmet", "price": 2500, "category": "Armor & Gear"},
+    "cloth_armor": {"name": "Cloth Armor", "id": "ClothArmor", "price": 100, "category": "Armor & Gear"},
+    "metal_armor": {"name": "Metal Armor", "id": "MetalArmor", "price": 600, "category": "Armor & Gear"},
+    "refined_metal_armor": {"name": "Refined Metal Armor", "id": "RefinedMetalArmor", "price": 1500, "category": "Armor & Gear"},
+    "pal_metal_armor": {"name": "Pal Metal Armor", "id": "PalMetalArmor", "price": 4000, "category": "Armor & Gear"},
+    "heat_resistant_armor": {"name": "Heat Resistant Metal Armor", "id": "HeatResistantMetalArmor", "price": 1800, "category": "Armor & Gear"},
+    "cold_resistant_armor": {"name": "Cold Resistant Metal Armor", "id": "ColdResistantMetalArmor", "price": 1800, "category": "Armor & Gear"},
 
     # Ammunition
     "arrow": {"name": "Arrow", "id": "Arrow", "price": 2, "category": "Ammunition"},
+    "fire_arrow": {"name": "Fire Arrow", "id": "FireArrow", "price": 5, "category": "Ammunition"},
+    "poison_arrow": {"name": "Poison Arrow", "id": "PoisonArrow", "price": 5, "category": "Ammunition"},
     "coarse_ammo": {"name": "Coarse Ammo", "id": "RoughBullet", "price": 5, "category": "Ammunition"},
     "handgun_ammo": {"name": "Handgun Ammo", "id": "HandgunBullet", "price": 12, "category": "Ammunition"},
     "rifle_ammo": {"name": "Assault Rifle Ammo", "id": "AssaultRifleBullet", "price": 25, "category": "Ammunition"},
@@ -110,17 +138,37 @@ SHOP_ITEMS = {
     # Food & Consumables
     "red_berries": {"name": "Red Berries", "id": "RedBerries", "price": 3, "category": "Food & Consumables"},
     "baked_berries": {"name": "Baked Berries", "id": "BakedBerries", "price": 5, "category": "Food & Consumables"},
+    "mushroom": {"name": "Mushroom", "id": "Mushroom", "price": 4, "category": "Food & Consumables"},
+    "baked_mushroom": {"name": "Baked Mushroom", "id": "BakedMushroom", "price": 8, "category": "Food & Consumables"},
     "bread": {"name": "Bread", "id": "Bread", "price": 15, "category": "Food & Consumables"},
     "jam_bun": {"name": "Jam-Filled Bun", "id": "JamBun", "price": 25, "category": "Food & Consumables"},
+    "egg": {"name": "Egg", "id": "Egg", "price": 10, "category": "Food & Consumables"},
+    "milk": {"name": "Milk", "id": "Milk", "price": 12, "category": "Food & Consumables"},
+    "honey": {"name": "Honey", "id": "Honey", "price": 20, "category": "Food & Consumables"},
     "cake": {"name": "Cake", "id": "Cake", "price": 250, "category": "Food & Consumables"},
     "salad": {"name": "Salad", "id": "Salad", "price": 120, "category": "Food & Consumables"},
     "pizza": {"name": "Pizza", "id": "Pizza", "price": 200, "category": "Food & Consumables"},
+    "pancakes": {"name": "Pancakes", "id": "Pancakes", "price": 80, "category": "Food & Consumables"},
+    "meat_mutton": {"name": "Mutton Meat", "id": "MuttonMeat", "price": 15, "category": "Food & Consumables"},
+    "meat_beef": {"name": "Eieboar Pork", "id": "Meat_Boar", "price": 15, "category": "Food & Consumables"},
+    "meat_chicken": {"name": "Chikipi Poultry", "id": "ChickenPalMeat", "price": 10, "category": "Food & Consumables"},
+
+    # Medicine & Seeds
+    "low_grade_medicine": {"name": "Low Grade Medical Kit", "id": "Medicina_1", "price": 50, "category": "Medicine & Seeds"},
+    "medical_kit": {"name": "Medical Kit", "id": "Medicina_2", "price": 150, "category": "Medicine & Seeds"},
+    "high_grade_medicine": {"name": "High Grade Medical Kit", "id": "Medicina_3", "price": 400, "category": "Medicine & Seeds"},
+    "memory_reset_pill": {"name": "Memory Reset Pill", "id": "ResetPill", "price": 1000, "category": "Medicine & Seeds"},
+    "wheat_seed": {"name": "Wheat Seeds", "id": "WheatSeed", "price": 20, "category": "Medicine & Seeds"},
+    "tomato_seed": {"name": "Tomato Seeds", "id": "TomatoSeed", "price": 30, "category": "Medicine & Seeds"},
+    "lettuce_seed": {"name": "Lettuce Seeds", "id": "LettuceSeed", "price": 30, "category": "Medicine & Seeds"},
+    "berry_seed": {"name": "Red Berry Seeds", "id": "BerrySeed", "price": 10, "category": "Medicine & Seeds"},
 
     # Valuables & Cores
     "ruby": {"name": "Ruby", "id": "Ruby", "price": 1250, "category": "Valuables & Cores"},
     "sapphire": {"name": "Sapphire", "id": "Sapphire", "price": 3000, "category": "Valuables & Cores"},
     "emerald": {"name": "Emerald", "id": "Emerald", "price": 6250, "category": "Valuables & Cores"},
     "diamond": {"name": "Diamond", "id": "Diamond", "price": 12500, "category": "Valuables & Cores"},
+    "gold_coin": {"name": "Gold Coin", "id": "GoldCoin", "price": 1, "category": "Valuables & Cores"},
     "dog_coin": {"name": "Dog Coin", "id": "DogCoin", "price": 150, "category": "Valuables & Cores"},
     "ancient_core": {"name": "Ancient Civilization Core", "id": "BossCivilizationCore", "price": 2500, "category": "Valuables & Cores"},
     "predator_core": {"name": "Predator Core", "id": "PredatorCore", "price": 2000, "category": "Valuables & Cores"},
@@ -181,7 +229,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Automated Login Daily Reward & Player Tracking Loop
+# 5. Fixed Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
@@ -189,6 +237,7 @@ is_players_initialized = False
 
 async def process_login_daily(player_uid: str, player_name: str):
     if not DATABASE_URL or not RCON_HOST:
+        logger.warning(f"Daily login skipped for {player_name}: DATABASE_URL or RCON_HOST missing.")
         return
     
     conn = await asyncpg.connect(DATABASE_URL)
@@ -199,10 +248,12 @@ async def process_login_daily(player_uid: str, player_name: str):
         if row:
             last_daily = row['last_daily']
             if last_daily and now < last_daily + timedelta(hours=24):
-                return  # Cooldown active (< 24 hours)
+                logger.info(f"Daily reward cooldown active for {player_name} (UID: {player_uid}). Last claimed: {last_daily}")
+                return
             
             new_bal = (row['balance'] or 0) + DAILY_PACK_SHOP_POINTS
             await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
+            logger.info(f"Updated daily reward balance for registered user {player_name} to {new_bal}")
         else:
             dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
             new_bal = DAILY_PACK_SHOP_POINTS
@@ -211,11 +262,13 @@ async def process_login_daily(player_uid: str, player_name: str):
                 VALUES ($1, $2, $3, $4)
                 ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
             ''', dummy_discord_id, str(player_uid), new_bal, now)
+            logger.info(f"Created auto-profile and granted daily reward for unregistered player {player_name} (UID: {player_uid})")
 
         # Deliver daily items via RCON
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
+                res = await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
+                logger.info(f"RCON give response for {item['rcon_id']} to {player_uid}: {res}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
         logger.info(f"Successfully delivered automated login daily pack to {player_name} (UID: {player_uid})")
@@ -248,12 +301,14 @@ async def poll_palworld_players_loop():
                     if not is_players_initialized:
                         known_online_players = current_ids
                         is_players_initialized = True
+                        logger.info(f"Initialized player tracker. Currently online players: {len(current_ids)}")
                     else:
                         joined_ids = current_ids - known_online_players
                         left_ids = known_online_players - current_ids
 
                         for jid in joined_ids:
                             name = current_players_map.get(jid, "A player")
+                            logger.info(f"Player join detected: {name} ({jid})")
                             asyncio.create_task(process_login_daily(jid, name))
 
                             if channel:
@@ -266,6 +321,7 @@ async def poll_palworld_players_loop():
 
                         for lid in left_ids:
                             name = last_known_player_names.get(lid, "A player")
+                            logger.info(f"Player leave detected: {name} ({lid})")
                             if channel:
                                 embed = discord.Embed(
                                     title="🔴 Player Left",
@@ -318,7 +374,7 @@ class ShopPaginator(discord.ui.View):
         self.max_pages = (len(items_list) - 1) // self.per_page
 
     def get_embed(self):
-        embed = discord.Embed(title="🛒 Palworld Server Shop (1.0 Database)", color=discord.Color.blue())
+        embed = discord.Embed(title="🛒 Palworld 1.0 Complete Item Shop", color=discord.Color.blue())
         start = self.current_page * self.per_page
         for item_id, data in self.items[start:start + self.per_page]:
             embed.add_field(name=f"{data['name']} (`{item_id}`)", value=f"Price: 🪙 **{data['price']} points**\nCategory: {data['category']}", inline=False)
@@ -398,15 +454,26 @@ async def daily(ctx):
     if not DATABASE_URL: return
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        row = await conn.fetchrow('SELECT balance, last_daily FROM users WHERE discord_id = $1', ctx.author.id)
-        if not row: return await ctx.send("❌ Use `!register <PlayerUID>` first!")
-        balance, last_daily = row
+        row = await conn.fetchrow('SELECT player_uid, balance, last_daily FROM users WHERE discord_id = $1', ctx.author.id)
+        if not row or not row['player_uid']: 
+            return await ctx.send("❌ Use `!register <PlayerUID>` first!")
+        
+        balance, last_daily, player_uid = row['balance'], row['last_daily'], row['player_uid']
         now = datetime.utcnow()
         if last_daily and now < last_daily + timedelta(days=1):
             return await ctx.send("⏳ You must wait 24 hours between claims.")
+        
         new_bal = balance + DAILY_PACK_SHOP_POINTS
         await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', new_bal, now, ctx.author.id)
-        await ctx.send(f"💰 Claimed **{DAILY_PACK_SHOP_POINTS} shop points**! Balance: {new_bal}")
+        
+        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            for item in DAILY_PACK_ITEMS:
+                await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
+        
+        await ctx.send(f"💰 Claimed **{DAILY_PACK_SHOP_POINTS} shop points** & daily pack items delivered! Balance: {new_bal}")
+    except Exception as e:
+        logger.error(f"Manual daily claim error: {e}")
+        await ctx.send(f"❌ Error claiming daily reward via RCON: {e}")
     finally:
         await conn.close()
 
