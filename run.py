@@ -154,14 +154,14 @@ def parse_secure_log_line(line: str):
     """
     Guarantees NO IP addresses are ever returned.
     - Chat: Returns ('CHAT', name, message) -> Name only, no IDs, no IPs
-    - Join: Returns ('JOIN', name, platform_id) -> Name + Steam/Xbox/PS ID, no IPs
-    - Leave: Returns ('LEAVE', name, platform_id) -> Name + Steam/Xbox/PS ID, no IPs
+    - Join: Returns ('JOIN', name, steam_id) -> Name + Steam ID, no IPs
+    - Leave: Returns ('LEAVE', name, steam_id) -> Name + Steam ID, no IPs
     """
     lower_line = line.lower()
 
-    # Extract platform ID (UserId / UID / SteamId)
+    # Extract Steam ID / User ID
     userid_match = re.search(r"(?:UserId|UID|SteamId)=([^\s,\)]+)", line, re.IGNORECASE)
-    platform_id = userid_match.group(1) if userid_match else None
+    steam_id = userid_match.group(1) if userid_match else None
 
     # Find valid player name from quotes, strictly ignoring IP addresses and GUIDs
     quoted_strings = re.findall(r"['\"]([^'\"]+)['\"]", line)
@@ -193,10 +193,10 @@ def parse_secure_log_line(line: str):
         return "CHAT", player_name, message
 
     elif any(kw in lower_line for kw in ["join", "connected", "login", "spawn", "connect"]):
-        return "JOIN", player_name, platform_id
+        return "JOIN", player_name, steam_id
 
     elif any(kw in lower_line for kw in ["leave", "disconnected", "logout", "disconnect", "quit"]):
-        return "LEAVE", player_name, platform_id
+        return "LEAVE", player_name, steam_id
 
     return None, None, None
 
@@ -246,10 +246,10 @@ async def sftp_chat_listener_loop():
                 if event_type == "CHAT":
                     await channel.send(f"💬 **{name}**: {data}")
                 elif event_type == "JOIN":
-                    id_str = f" (ID: `{data}`)" if data else ""
+                    id_str = f" (Steam ID: `{data}`)" if data else ""
                     await channel.send(f"🟢 **{name}** joined the server.{id_str}")
                 elif event_type == "LEAVE":
-                    id_str = f" (ID: `{data}`)" if data else ""
+                    id_str = f" (Steam ID: `{data}`)" if data else ""
                     await channel.send(f"🔴 **{name}** left the server.{id_str}")
 
         except Exception as e:
