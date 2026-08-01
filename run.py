@@ -343,15 +343,17 @@ async def on_message(message):
         return
 
     # Broadcast Discord message into the Palworld server via RCON
+    # Palworld requires spaces to be replaced with underscores (_) so messages don't get cut off.
     if SFTP_HOST and ADMIN_PASSWORD:
         try:
-            chat_text = f"[Discord] {message.author.display_name}: {message.content}"
+            display_name = message.author.display_name.replace(" ", "_")
+            content = message.content.replace(" ", "_")
+            chat_text = f"[Discord]_{display_name}:_{content}"
             async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
                 await rcon.send(f"Broadcast {chat_text}")
         except Exception as e:
             logger.error(f"Failed to relay Discord message to game server: {e}")
 
-    # Ensure other bot commands still work properly
     await bot.process_commands(message)
 
 @bot.command(name="players")
