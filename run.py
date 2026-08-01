@@ -45,9 +45,17 @@ DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 RCON_PORT = int(os.getenv("RCON_PORT", "25575").strip())
 
 # -------------------------------------------------------------
-# 2. Shop Catalog Configuration
+# 2. Daily Login Pack & Shop Catalog Configuration
 # -------------------------------------------------------------
-DAILY_REWARD_AMOUNT = 500
+DAILY_PACK_SHOP_POINTS = 1000
+DAILY_PACK_ITEMS = [
+    {"rcon_id": "Cake", "quantity": 50},
+    {"rcon_id": "GoldCoin", "quantity": 10000},
+    {"rcon_id": "BossCivilizationCore", "quantity": 10},
+    {"rcon_id": "PredatorCore", "quantity": 10},
+    {"rcon_id": "DogCoin", "quantity": 250}
+]
+
 PLAYTIME_REWARD_AMOUNT = 100
 
 SHOP_ITEMS = {
@@ -105,7 +113,7 @@ async def init_db():
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 discord_id BIGINT PRIMARY KEY,
-                player_uid TEXT,
+                player_uid TEXT UNIQUE,
                 balance INTEGER DEFAULT 0,
                 last_daily TIMESTAMP
             )
@@ -134,11 +142,11 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         else: base_url += '/v1/api'
             
     url = f"{base_url}{endpoint}"
-    auth = aiohttp.BasicAuth("admin", ADMIN_PASSWORD)
+    auth_header = {"Authorization": aiohttp.encode_basic_auth("admin", ADMIN_PASSWORD)}
     
     try:
-        async with aiohttp.ClientSession(auth=auth) as session:
-            async with session.request(method, url, json=payload, timeout=10) as response:
+        async with aiohttp.ClientSession() as session:
+            async with session.request(method, url, json=payload, headers=auth_header, timeout=10) as response:
                 if response.status == 200:
                     content_type = response.headers.get("Content-Type", "")
                     if "application/json" in content_type:
@@ -152,18 +160,55 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. REST API Player Tracking Loop (Joins & Leaves)
+# 5. Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
 is_players_initialized = False
+
+async def process_login_daily(player_uid: str, player_name: str):
+    if not DATABASE_URL or not RCON_HOST:
+        return
+    
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        row = await conn.fetchrow('SELECT discord_id, balance, last_daily FROM users WHERE player_uid = $1', str(player_uid))
+        now = datetime.utcnow()
+        
+        if row:
+            last_daily = row['last_daily']
+            if last_daily and now < last_daily + timedelta(hours=24):
+                return  # Cooldown active (< 24 hours)
+            
+            new_bal = (row['balance'] or 0) + DAILY_PACK_SHOP_POINTS
+            await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
+        else:
+            dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
+            new_bal = DAILY_PACK_SHOP_POINTS
+            await conn.execute('''
+                INSERT INTO users (discord_id, player_uid, balance, last_daily)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
+            ''', dummy_discord_id, str(player_uid), new_bal, now)
+
+        # Deliver daily items via RCON
+        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            for item in DAILY_PACK_ITEMS:
+                await rcon.send(f"give {player_uid} {item['rcon_id']} {item['quantity']}")
+            await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
+            
+        logger.info(f"Successfully delivered automated login daily pack to {player_name} (UID: {player_uid})")
+    except Exception as e:
+        logger.error(f"Error processing login daily pack for {player_name}: {e}")
+    finally:
+        await conn.close()
 
 async def poll_palworld_players_loop():
     global known_online_players, last_known_player_names, is_players_initialized
     await bot.wait_until_ready()
     
     while not bot.is_closed():
-        if DISCORD_CHAT_CHANNEL_ID and REST_API_URL and ADMIN_PASSWORD:
+        if REST_API_URL and ADMIN_PASSWORD:
             try:
                 data, error = await call_palworld_api("/players", method="GET")
                 if not error and data:
@@ -177,7 +222,7 @@ async def poll_palworld_players_loop():
                             last_known_player_names[str(pid)] = pname
 
                     current_ids = set(current_players_map.keys())
-                    channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
+                    channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
                     if not is_players_initialized:
                         known_online_players = current_ids
@@ -186,9 +231,12 @@ async def poll_palworld_players_loop():
                         joined_ids = current_ids - known_online_players
                         left_ids = known_online_players - current_ids
 
-                        if channel:
-                            for jid in joined_ids:
-                                name = current_players_map.get(jid, "A player")
+                        for jid in joined_ids:
+                            name = current_players_map.get(jid, "A player")
+                            # Trigger automatic login daily pack delivery
+                            asyncio.create_task(process_login_daily(jid, name))
+
+                            if channel:
                                 embed = discord.Embed(
                                     title="🟢 Player Joined",
                                     description=f"**{name}** has joined the server!",
@@ -196,8 +244,9 @@ async def poll_palworld_players_loop():
                                 )
                                 await channel.send(embed=embed)
 
-                            for lid in left_ids:
-                                name = last_known_player_names.get(lid, "A player")
+                        for lid in left_ids:
+                            name = last_known_player_names.get(lid, "A player")
+                            if channel:
                                 embed = discord.Embed(
                                     title="🔴 Player Left",
                                     description=f"**{name}** has left the server.",
@@ -335,9 +384,9 @@ async def daily(ctx):
         now = datetime.utcnow()
         if last_daily and now < last_daily + timedelta(days=1):
             return await ctx.send("⏳ You must wait 24 hours between claims.")
-        new_bal = balance + DAILY_REWARD_AMOUNT
+        new_bal = balance + DAILY_PACK_SHOP_POINTS
         await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', new_bal, now, ctx.author.id)
-        await ctx.send(f"💰 Claimed **{DAILY_REWARD_AMOUNT} coins**! Balance: {new_bal}")
+        await ctx.send(f"💰 Claimed **{DAILY_PACK_SHOP_POINTS} shop points**! Balance: {new_bal}")
     finally:
         await conn.close()
 
@@ -347,7 +396,7 @@ async def balance(ctx):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT balance FROM users WHERE discord_id = $1', ctx.author.id)
-        await ctx.send(f"💳 Balance: **{row['balance'] if row else 0} coins**.")
+        await ctx.send(f"💳 Balance: **{row['balance'] if row else 0} shop points**.")
     finally:
         await conn.close()
 
