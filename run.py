@@ -21,41 +21,65 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 1. Environment & Configuration
+# 1. Environment & Configuration (Auto-sanitized against brackets)
 # -------------------------------------------------------------
 DISCORD_TOKEN = (
     os.getenv("DISCORD_TOKEN")
     or os.getenv("BOT_TOKEN")
     or ""
-).strip()
+).strip().strip("[]()").strip()
 
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
 
-# REST API Configuration (Replaces RCON to bypass Indifferent Broccoli firewall restrictions)
-REST_API_URL = os.getenv("REST_API_URL", "").strip()
+# REST API Configuration
+REST_API_URL = (
+    os.getenv("REST_API_URL")
+    or ""
+).strip().strip("[]()").strip()
+
 ADMIN_PASSWORD = (
     os.getenv("ADMIN_PASSWORD")
     or os.getenv("RCON_PASSWORD")
     or ""
-).strip()
+).strip().strip("[]()").strip()
 
 WEB_PORT = int(os.getenv("PORT", "10000"))
 
-# Supabase Database URL (Pooled connection for IPv4/Render compatibility)
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+# Supabase Database URL
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("SUPABASE_URL")
+    or ""
+).strip().strip("[]()").strip()
 
-# SFTP Settings (For live chat mirroring)
-SFTP_HOST = os.getenv("SFTP_HOST", "").strip()
+# SFTP Settings
+SFTP_HOST = (
+    os.getenv("SFTP_HOST")
+    or ""
+).strip().strip("[]()").strip()
+
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
-SFTP_USER = os.getenv("SFTP_USER", "").strip()
-SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", "").strip()
-SFTP_LOG_PATH = os.getenv("SFTP_LOG_PATH", "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip()
+
+SFTP_USER = (
+    os.getenv("SFTP_USER")
+    or ""
+).strip().strip("[]()").strip()
+
+SFTP_PASSWORD = (
+    os.getenv("SFTP_PASSWORD")
+    or ""
+).strip().strip("[]()").strip()
+
+SFTP_LOG_PATH = (
+    os.getenv("SFTP_LOG_PATH")
+    or "/Pal/Saved/SaveGames/PalDefender/Chat.log"
+).strip().strip("[]()").strip()
 
 _channel_val = (
     os.getenv("DISCORD_CHAT_CHANNEL_ID")
     or os.getenv("CHANNEL_ID")
     or "0"
-).strip()
+).strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 # -------------------------------------------------------------
@@ -349,7 +373,7 @@ async def buy(ctx, item_key: str, quantity: int = 1):
         new_balance = current_balance - total_cost
         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
         
-        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**! Deducted **{total_cost} coins**. Remaining balance: **{new_balance}**.\n*(Note: Since Indifferent Broccoli restricts RCON item spawning, please contact an admin or use your coins balance for server rewards!)*")
+        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**! Deducted **{total_cost} coins**. Remaining balance: **{new_balance}**.")
     except Exception as e:
         logger.error(f"Database error on buy: {e}")
         await ctx.send("❌ An error occurred processing your purchase.")
