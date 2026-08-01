@@ -47,10 +47,9 @@ RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
 # 2. Fully Cross-Checked Version 1.0 Obtainable Shop Catalog
 # -------------------------------------------------------------
 DAILY_REWARD_AMOUNT = 500
-PLAYTIME_REWARD_AMOUNT = 100  # Coins awarded per hour online
+PLAYTIME_REWARD_AMOUNT = 100
 
 SHOP_ITEMS = {
-    # === SPHERES ===
     "palsphere": {"name": "Pal Sphere", "rcon_id": "PalSphere", "price": 25, "category": "Spheres"},
     "megasphere": {"name": "Mega Sphere", "rcon_id": "PalSphere_Mega", "price": 75, "category": "Spheres"},
     "gigasphere": {"name": "Giga Sphere", "rcon_id": "PalSphere_Giga", "price": 200, "category": "Spheres"},
@@ -58,8 +57,6 @@ SHOP_ITEMS = {
     "ultrasphere": {"name": "Ultra Sphere", "rcon_id": "PalSphere_Exotic", "price": 750, "category": "Spheres"},
     "legendarysphere": {"name": "Legendary Sphere", "rcon_id": "PalSphere_Legend", "price": 1250, "category": "Spheres"},
     "ultimate_sphere": {"name": "Ultimate Sphere", "rcon_id": "PalSphere_Ultimate", "price": 2500, "category": "Spheres"},
-
-    # === BASIC MATERIALS ===
     "wood": {"name": "Wood", "rcon_id": "Wood", "price": 1, "category": "Basic Materials"},
     "stone": {"name": "Stone", "rcon_id": "Stone", "price": 1, "category": "Basic Materials"},
     "fiber": {"name": "Fiber", "rcon_id": "Fiber", "price": 2, "category": "Basic Materials"},
@@ -74,8 +71,6 @@ SHOP_ITEMS = {
     "iceorgan": {"name": "Ice Organ", "rcon_id": "IceOrgan", "price": 25, "category": "Basic Materials"},
     "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 25, "category": "Basic Materials"},
     "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 25, "category": "Basic Materials"},
-
-    # === ORES, INGOTS & METALS ===
     "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 12, "category": "Ores & Ingots"},
     "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 25, "category": "Ores & Ingots"},
     "coal": {"name": "Coal", "rcon_id": "Coal", "price": 25, "category": "Ores & Ingots"},
@@ -84,81 +79,18 @@ SHOP_ITEMS = {
     "quartz": {"name": "Pure Quartz", "rcon_id": "Quartz", "price": 50, "category": "Ores & Ingots"},
     "palmetal": {"name": "Pal Metal Ingot", "rcon_id": "StealIngot", "price": 125, "category": "Ores & Ingots"},
     "plasteel": {"name": "Plasteel", "rcon_id": "Plasteel", "price": 250, "category": "Ores & Ingots"},
-    "soraliteingot": {"name": "Soralite Ingot", "rcon_id": "SoraliteIngot", "price": 350, "category": "Ores & Ingots"},
-
-    # === ADVANCED & SPECIAL MATERIALS ===
     "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 75, "category": "Advanced Materials"},
     "carbonfiber": {"name": "Carbon Fiber", "rcon_id": "CarbonFiber", "price": 100, "category": "Advanced Materials"},
     "cement": {"name": "Cement", "rcon_id": "Cement", "price": 38, "category": "Advanced Materials"},
     "circuitboard": {"name": "Circuit Board", "rcon_id": "MachinePart", "price": 125, "category": "Advanced Materials"},
     "aicore": {"name": "AI Core", "rcon_id": "AIcore", "price": 500, "category": "Advanced Materials"},
-    "ancienttechpart": {"name": "Ancient Civilization Parts", "rcon_id": "AncientTechnologyPart", "price": 100, "category": "Advanced Materials"},
     "dogcoin": {"name": "Dog Coin", "rcon_id": "DogCoin", "price": 150, "category": "Advanced Materials"},
-
-    # === AMMUNITION ===
     "arrow": {"name": "Arrow", "rcon_id": "Arrow", "price": 2, "category": "Ammunition"},
-    "firearrow": {"name": "Fire Arrow", "rcon_id": "FireArrow", "price": 5, "category": "Ammunition"},
-    "poisonarrow": {"name": "Poison Arrow", "rcon_id": "PoisonArrow", "price": 5, "category": "Ammunition"},
-    "coarseammo": {"name": "Coarse Ammo", "rcon_id": "RoughBullet", "price": 7, "category": "Ammunition"},
     "handgunammo": {"name": "Handgun Ammo", "rcon_id": "HandgunBullet", "price": 12, "category": "Ammunition"},
     "rifleammo": {"name": "Rifle Ammo", "rcon_id": "RifleBullet", "price": 25, "category": "Ammunition"},
     "shotgunammo": {"name": "Shotgun Shells", "rcon_id": "ShotgunBullet", "price": 30, "category": "Ammunition"},
     "assaultammo": {"name": "Assault Rifle Ammo", "rcon_id": "AssaultRifleBullet", "price": 38, "category": "Ammunition"},
     "rocketammo": {"name": "Rocket Ammo", "rcon_id": "ExplosiveBullet", "price": 250, "category": "Ammunition"},
-    "energycartridge": {"name": "Energy Cartridge", "rcon_id": "EnergyCartridge", "price": 50, "category": "Ammunition"},
-    "plasteelammo": {"name": "Plasteel Ammo", "rcon_id": "PlasteelBullet", "price": 100, "category": "Ammunition"},
-
-    # === MELEE WEAPONS & SPEARS ===
-    "stonespear": {"name": "Stone Spear", "rcon_id": "StoneSpear", "price": 50, "category": "Melee & Spears"},
-    "metalspear": {"name": "Metal Spear", "rcon_id": "MetalSpear", "price": 150, "category": "Melee & Spears"},
-    "refinedmetalspear": {"name": "Refined Metal Spear", "rcon_id": "RefinedMetalSpear", "price": 400, "category": "Melee & Spears"},
-    "sword": {"name": "Sword", "rcon_id": "Sword", "price": 750, "category": "Melee & Spears"},
-    "electricsword": {"name": "Electric Sword", "rcon_id": "ElectricSword", "price": 2000, "category": "Melee & Spears"},
-    "beamsword": {"name": "Beam Sword", "rcon_id": "BeamSword", "price": 5000, "category": "Melee & Spears"},
-
-    # === RANGED WEAPONS ===
-    "oldbow": {"name": "Old Bow", "rcon_id": "OldBow", "price": 125, "category": "Weapons"},
-    "mechanicalbow": {"name": "Mechanical Bow", "rcon_id": "MechanicalBow", "price": 750, "category": "Weapons"},
-    "crossbow": {"name": "Crossbow", "rcon_id": "Crossbow", "price": 375, "category": "Weapons"},
-    "musket": {"name": "Musket", "rcon_id": "Musket", "price": 500, "category": "Weapons"},
-    "handgun": {"name": "Handgun", "rcon_id": "Handgun", "price": 1250, "category": "Weapons"},
-    "singleshotrifle": {"name": "Single-shot Rifle", "rcon_id": "Rifle", "price": 2000, "category": "Weapons"},
-    "doublebarrel": {"name": "Double Barrel Shotgun", "rcon_id": "DoubleBarrelShotgun", "price": 3000, "category": "Weapons"},
-    "assaultrifle": {"name": "Assault Rifle", "rcon_id": "AssaultRifle", "price": 5000, "category": "Weapons"},
-    "combatsmg": {"name": "Combat SMG", "rcon_id": "CombatSMG", "price": 4500, "category": "Weapons"},
-    "pumpactionshotgun": {"name": "Pump-action Shotgun", "rcon_id": "PumpActionShotgun", "price": 6250, "category": "Weapons"},
-    "laserrifle": {"name": "Laser Rifle", "rcon_id": "LaserRifle", "price": 10000, "category": "Weapons"},
-    "flamethrower": {"name": "Flamethrower", "rcon_id": "FlameThrower", "price": 12000, "category": "Weapons"},
-    "gatlinggun": {"name": "Gatling Gun", "rcon_id": "GatlingGun", "price": 15000, "category": "Weapons"},
-    "rocketlauncher": {"name": "Rocket Launcher", "rcon_id": "RocketLauncher", "price": 18750, "category": "Weapons"},
-
-    # === ARMOR & SHIELDS ===
-    "clotharmor": {"name": "Cloth Armor", "rcon_id": "ClothArmor", "price": 100, "category": "Armor & Shields"},
-    "peltarmor": {"name": "Pelt Armor", "rcon_id": "PeltArmor", "price": 300, "category": "Armor & Shields"},
-    "metalarmor": {"name": "Metal Armor", "rcon_id": "MetalArmor", "price": 1250, "category": "Armor & Shields"},
-    "refinedmetalarmor": {"name": "Refined Metal Armor", "rcon_id": "RefinedMetalArmor", "price": 5000, "category": "Armor & Shields"},
-    "palmetalarmor": {"name": "Pal Metal Armor", "rcon_id": "PalMetalArmor", "price": 20000, "category": "Armor & Shields"},
-    "plasteelarmor": {"name": "Plasteel Armor", "rcon_id": "PlasteelArmor", "price": 35000, "category": "Armor & Shields"},
-    "megashield": {"name": "Mega Shield", "rcon_id": "MegaShield", "price": 750, "category": "Armor & Shields"},
-    "gigashield": {"name": "Giga Shield", "rcon_id": "GigaShield", "price": 2500, "category": "Armor & Shields"},
-    "hypershield": {"name": "Hyper Shield", "rcon_id": "HyperShield", "price": 7500, "category": "Armor & Shields"},
-
-    # === GLIDERS & UTILITIES ===
-    "megaglider": {"name": "Mega Glider", "rcon_id": "Glider_Good", "price": 100, "category": "Gliders & Utilities"},
-    "gigaglider": {"name": "Giga Glider", "rcon_id": "Glider_Super", "price": 300, "category": "Gliders & Utilities"},
-    "hyperglider": {"name": "Hyper Glider", "rcon_id": "Glider_Legend", "price": 800, "category": "Gliders & Utilities"},
-    "lantern": {"name": "Lantern", "rcon_id": "Lantern", "price": 150, "category": "Gliders & Utilities"},
-
-    # === MEDICINE & CONSUMABLES ===
-    "lowmeds": {"name": "Low Grade Medical Supplies", "rcon_id": "Herb", "price": 50, "category": "Medicine & Consumables"},
-    "meds": {"name": "Medical Supplies", "rcon_id": "Medicines", "price": 125, "category": "Medicine & Consumables"},
-    "highmeds": {"name": "High Grade Medical Supplies", "rcon_id": "LuxuryMedicines", "price": 250, "category": "Medicine & Consumables"},
-    "memorywipe": {"name": "Memory Wiping Medicine", "rcon_id": "MemoryWipeMedicine", "price": 2500, "category": "Medicine & Consumables"},
-    "berries": {"name": "Red Berries", "rcon_id": "Berry", "price": 2, "category": "Medicine & Consumables"},
-    "bread": {"name": "Bread", "rcon_id": "Bread", "price": 25, "category": "Medicine & Consumables"},
-    "honey": {"name": "Honey", "rcon_id": "Honey", "price": 25, "category": "Medicine & Consumables"},
-
-    # === VALUABLES ===
     "ruby": {"name": "Ruby", "rcon_id": "Ruby", "price": 1250, "category": "Valuables"},
     "sapphire": {"name": "Sapphire", "rcon_id": "Sapphire", "price": 3000, "category": "Valuables"},
     "emerald": {"name": "Emerald", "rcon_id": "Emerald", "price": 6250, "category": "Valuables"},
@@ -167,7 +99,6 @@ SHOP_ITEMS = {
 
 async def init_db():
     if not DATABASE_URL:
-        logger.critical("DATABASE_URL environment variable is missing!")
         return
     try:
         conn = await asyncpg.connect(DATABASE_URL)
@@ -180,7 +111,6 @@ async def init_db():
             )
         ''')
         await conn.close()
-        logger.info("✅ Connected to Supabase and verified database table.")
     except Exception as e:
         logger.critical(f"Failed to connect to Supabase: {e}")
 
@@ -211,34 +141,33 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
             if method == "GET":
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200: return await response.json(), None
-                    else: return None, f"HTTP {response.status}: {await response.text()}"
+                    else: return None, f"HTTP {response.status}"
     except Exception as e:
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Background Loops (Sanitized SFTP Chat & Playtime Rewards)
+# 5. Background Loops (Safe SFTP Chat Parser)
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
 
 def parse_clean_chat(line: str):
-    """Safely extracts only the player name and message, filtering out IPs and IDs."""
-    if "Chat:" not in line:
-        return None
+    """Extracts ONLY the clean player name and message, completely discarding IP/IDs."""
+    if "UserId=" not in line and "IP=" not in line and "Chat:" not in line:
+        return None, None
     
-    # Isolate everything after 'Chat:'
-    parts = line.split("Chat:", 1)
-    if len(parts) < 2:
-        return None
-    raw_content = parts[1].strip()
-    
-    # Remove IP addresses/ports (e.g., [192.168.1.1:8211])
-    raw_content = re.sub(r'\[\d{1,3}(?:\.\d{1,3}){3}:\d+\]', '', raw_content)
-    # Remove SteamIDs or PlayerUIDs wrapped in brackets (e.g., [76561198...])
-    raw_content = re.sub(r'\[[0-9a-zA-Z_-]{10,}\]', '', raw_content)
-    
-    cleaned = raw_content.strip()
-    return cleaned if cleaned else None
+    name_match = re.search(r"['\"]([^'\"]+)['\"]\s*\([^)]*(?:UserId|IP|UID)[^)]*\)", line)
+    if not name_match:
+        return None, None
+    player_name = name_match.group(1)
+
+    parts = line.split("]: ")
+    if len(parts) > 1:
+        message = parts[-1].strip()
+    else:
+        message = line.split(":")[-1].strip()
+
+    return player_name, message if message else None
 
 async def sftp_chat_listener_loop():
     global last_position, last_file_name
@@ -247,7 +176,6 @@ async def sftp_chat_listener_loop():
     channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
     if not channel: return
 
-    logger.info(f"📡 SFTP Listener Active Directory: {SFTP_LOG_PATH}")
     while not bot.is_closed():
         try:
             def scan_logs():
@@ -281,51 +209,38 @@ async def sftp_chat_listener_loop():
 
             new_lines = await asyncio.to_thread(scan_logs)
             for line in new_lines:
-                chat_msg = parse_clean_chat(line)
-                if chat_msg:
-                    await channel.send(f"💬 **{chat_msg}**")
+                player_name, chat_msg = parse_clean_chat(line)
+                if player_name and chat_msg:
+                    await channel.send(f"💬 **{player_name}**: {chat_msg}")
         except Exception as e:
             logger.error(f"SFTP Error: {e}")
             
         await asyncio.sleep(3)
 
 async def playtime_reward_loop():
-    """Awards coins hourly to players actively online on the server."""
     await bot.wait_until_ready()
-    logger.info("⏰ Playtime Reward Loop Active (100 coins/hour)")
     while not bot.is_closed():
-        await asyncio.sleep(3600)  # Runs every 1 hour
-        if not DATABASE_URL or not REST_API_URL:
-            continue
-            
+        await asyncio.sleep(3600)
+        if not DATABASE_URL or not REST_API_URL: continue
         try:
             data, error = await call_palworld_api("/players", method="GET")
-            if error or not data:
-                continue
-                
+            if error or not data: continue
             players = data.get("players", [])
-            if not players:
-                continue
-                
+            if not players: continue
+            
             conn = await asyncpg.connect(DATABASE_URL)
             try:
                 for p in players:
                     uid = p.get("playeruid", p.get("userId"))
-                    if not uid:
-                        continue
-                        
+                    if not uid: continue
                     row = await conn.fetchrow('SELECT discord_id, balance FROM users WHERE player_uid = $1', uid)
                     if row:
-                        discord_id = row['discord_id']
-                        new_balance = row['balance'] + PLAYTIME_REWARD_AMOUNT
-                        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, discord_id)
-                        logger.info(f"Awarded {PLAYTIME_REWARD_AMOUNT} playtime coins to player UID {uid} (Discord ID: {discord_id})")
-            except Exception as db_err:
-                logger.error(f"Database error in playtime reward loop: {db_err}")
+                        new_bal = row['balance'] + PLAYTIME_REWARD_AMOUNT
+                        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_bal, row['discord_id'])
             finally:
                 await conn.close()
         except Exception as e:
-            logger.error(f"Error in playtime reward loop: {e}")
+            logger.error(f"Playtime loop error: {e}")
 
 # -------------------------------------------------------------
 # 6. Shop Pagination View UI
@@ -340,54 +255,36 @@ class ShopPaginator(discord.ui.View):
         self.max_pages = (len(items_list) - 1) // self.per_page
 
     def get_embed(self):
-        embed = discord.Embed(
-            title="🛒 Palworld Server Shop",
-            description="Use `!buy <item_id> <quantity>` to purchase items directly in-game!",
-            color=discord.Color.blue()
-        )
-        
+        embed = discord.Embed(title="🛒 Palworld Server Shop", color=discord.Color.blue())
         start = self.current_page * self.per_page
-        end = start + self.per_page
-        page_items = self.items[start:end]
-
-        for item_id, data in page_items:
-            embed.add_field(
-                name=f"{data['name']} (`{item_id}`)",
-                value=f"Category: **{data['category']}**\nPrice: 🪙 **{data['price']} coins**",
-                inline=False
-            )
-
+        for item_id, data in self.items[start:start + self.per_page]:
+            embed.add_field(name=f"{data['name']} (`{item_id}`)", value=f"Price: 🪙 **{data['price']} coins**", inline=False)
         embed.set_footer(text=f"Page {self.current_page + 1} of {self.max_pages + 1} | Use !buy <item_id> <quantity>")
         return embed
 
     @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.primary)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author_id:
-            return await interaction.response.send_message("This isn't your shop menu!", ephemeral=True)
+        if interaction.user.id != self.author_id: return await interaction.response.send_message("Not your menu!", ephemeral=True)
         if self.current_page > 0:
             self.current_page -= 1
             await interaction.response.edit_message(embed=self.get_embed(), view=self)
-        else:
-            await interaction.response.defer()
+        else: await interaction.response.defer()
 
     @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.primary)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author_id:
-            return await interaction.response.send_message("This isn't your shop menu!", ephemeral=True)
+        if interaction.user.id != self.author_id: return await interaction.response.send_message("Not your menu!", ephemeral=True)
         if self.current_page < self.max_pages:
             self.current_page += 1
             await interaction.response.edit_message(embed=self.get_embed(), view=self)
-        else:
-            await interaction.response.defer()
+        else: await interaction.response.defer()
 
 # -------------------------------------------------------------
-# 7. Discord Events & Standard Commands
+# 7. Discord Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
     await init_db()
     logger.info(f"✅ Bot connected as {bot.user}")
-    
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(sftp_chat_listener_loop())
@@ -396,31 +293,19 @@ async def on_ready():
 @bot.command(name="players")
 async def list_players(ctx):
     data, error = await call_palworld_api("/players", method="GET")
-    if error:
-        await ctx.send(f"❌ **REST API Error:**\n`{error}`")
-        return
+    if error: return await ctx.send(f"❌ Error: `{error}`")
     players = data.get("players", [])
-    if not players:
-        await ctx.send("🎮 **Server Status:** 0 players currently online.")
-        return
-
-    player_list = "\n".join([f"• **{p.get('name', 'Unknown')}** (Level {p.get('level', '?')}, UID: `{p.get('playeruid', p.get('userId', 'N/A'))}`)" for p in players])
-    embed = discord.Embed(title=f"Online Players ({len(players)})", description=player_list, color=discord.Color.blue())
-    await ctx.send(embed=embed)
+    if not players: return await ctx.send("🎮 0 players online.")
+    list_str = "\n".join([f"• **{p.get('name', 'Unknown')}** (Lvl {p.get('level', '?')})" for p in players])
+    await ctx.send(embed=discord.Embed(title=f"Online Players ({len(players)})", description=list_str, color=discord.Color.blue()))
 
 @bot.command(name="register")
 async def register(ctx, player_uid: str):
     if not DATABASE_URL: return
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        await conn.execute('''
-            INSERT INTO users (discord_id, player_uid) 
-            VALUES ($1, $2) 
-            ON CONFLICT (discord_id) DO UPDATE SET player_uid = $2
-        ''', ctx.author.id, player_uid)
-        await ctx.send(f"✅ Registered! Your Discord is now linked to Palworld UID: `{player_uid}`")
-    except Exception as e:
-        await ctx.send("❌ An error occurred while registering.")
+        await conn.execute('INSERT INTO users (discord_id, player_uid) VALUES ($1, $2) ON CONFLICT (discord_id) DO UPDATE SET player_uid = $2', ctx.author.id, player_uid)
+        await ctx.send(f"✅ Registered linked UID: `{player_uid}`")
     finally:
         await conn.close()
 
@@ -430,23 +315,14 @@ async def daily(ctx):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT balance, last_daily FROM users WHERE discord_id = $1', ctx.author.id)
-        if not row:
-            await ctx.send("❌ You need to `!register <PlayerUID>` first!")
-            return
-            
+        if not row: return await ctx.send("❌ Use `!register <PlayerUID>` first!")
         balance, last_daily = row
         now = datetime.utcnow()
-        
         if last_daily and now < last_daily + timedelta(days=1):
-            wait_time = (last_daily + timedelta(days=1)) - now
-            hours, remainder = divmod(wait_time.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
-            await ctx.send(f"⏳ You must wait {hours}h {minutes}m before claiming your next daily.")
-            return
-
-        new_balance = balance + DAILY_REWARD_AMOUNT
-        await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', new_balance, now, ctx.author.id)
-        await ctx.send(f"💰 You claimed your daily reward of **{DAILY_REWARD_AMOUNT} coins**! Use `!shop` to browse items.\n💳 **New balance:** {new_balance} coins.")
+            return await ctx.send("⏳ You must wait 24 hours between claims.")
+        new_bal = balance + DAILY_REWARD_AMOUNT
+        await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', new_bal, now, ctx.author.id)
+        await ctx.send(f"💰 Claimed **{DAILY_REWARD_AMOUNT} coins**! Balance: {new_bal}")
     finally:
         await conn.close()
 
@@ -456,83 +332,49 @@ async def balance(ctx):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT balance FROM users WHERE discord_id = $1', ctx.author.id)
-        if row: await ctx.send(f"💳 You have **{row['balance']} coins**.")
-        else: await ctx.send("❌ You are not registered. Use `!register <PlayerUID>`.")
+        await ctx.send(f"💳 Balance: **{row['balance'] if row else 0} coins**.")
     finally:
         await conn.close()
 
 @bot.command(name="shop")
 async def shop(ctx):
-    """Displays items available for purchase with interactive pagination buttons."""
-    items_list = list(SHOP_ITEMS.items())
-    view = ShopPaginator(items_list, ctx.author.id)
+    view = ShopPaginator(list(SHOP_ITEMS.items()), ctx.author.id)
     await ctx.send(embed=view.get_embed(), view=view)
 
 @bot.command(name="buy")
 async def buy(ctx, item_key: str, quantity: int = 1):
     if not DATABASE_URL: return
-
     item_key = item_key.lower()
-    if item_key not in SHOP_ITEMS:
-        await ctx.send("❌ Item not found. Check `!shop`.")
-        return
-        
-    if quantity <= 0: return
-
+    if item_key not in SHOP_ITEMS or quantity <= 0: return await ctx.send("❌ Invalid item or quantity.")
     item = SHOP_ITEMS[item_key]
-    total_cost = item['price'] * quantity
+    cost = item['price'] * quantity
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT player_uid, balance FROM users WHERE discord_id = $1', ctx.author.id)
-        if not row:
-            await ctx.send("❌ You are not registered. Use `!register <PlayerUID>` first.")
-            return
-            
-        player_uid = row['player_uid']
-        current_balance = row['balance']
-
-        if current_balance < total_cost:
-            await ctx.send(f"❌ Not enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
-            return
-
-        try:
-            async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-                rcon_command = f"give {player_uid} {item['rcon_id']} {quantity}"
-                logger.info(f"Executing RCON: {rcon_command}")
-                await rcon.send(rcon_command)
-        except Exception as e:
-            logger.error(f"RCON Error during buy: {e}")
-            await ctx.send(f"❌ **Delivery Failed:** Could not connect to the game server via RCON. Your coins were **not** deducted.")
-            return
-
-        new_balance = current_balance - total_cost
-        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
+        if not row or row['balance'] < cost:
+            return await ctx.send("❌ Not registered or insufficient funds.")
         
-        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**!\n🎁 *Injected into your in-game inventory via PalDefender!*\n💳 Deducted **{total_cost} coins**. Remaining: **{new_balance}**.")
+        async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            await rcon.send(f"give {row['player_uid']} {item['rcon_id']} {quantity}")
+        
+        new_bal = row['balance'] - cost
+        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_bal, ctx.author.id)
+        await ctx.send(f"✅ Purchased {quantity}x **{item['name']}**! New balance: {new_bal}")
     except Exception as e:
-        logger.error(f"Database error on buy: {e}")
+        await ctx.send(f"❌ Delivery failed: {e}")
     finally:
         await conn.close()
 
 # -------------------------------------------------------------
-# 8. Web Server & Main Loop
+# 8. Web Server & Main
 # -------------------------------------------------------------
-async def health_check_handler(request):
-    return web.Response(text="OK - Palworld Bot is active")
-
-async def start_web_server():
+async def main():
     app = web.Application()
-    app.router.add_get("/", health_check_handler)
-    app.router.add_get("/health", health_check_handler)
+    app.router.add_get("/", lambda r: web.Response(text="OK"))
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", WEB_PORT)
-    await site.start()
-
-async def main():
-    if not DISCORD_TOKEN: sys.exit(1)
-    await start_web_server()
+    await web.TCPSite(runner, "0.0.0.0", WEB_PORT).start()
     async with bot: await bot.start(DISCORD_TOKEN)
 
 if __name__ == "__main__":
