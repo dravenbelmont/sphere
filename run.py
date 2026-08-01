@@ -20,11 +20,14 @@ logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
 # 1. Environment & Configuration
+# Fits existing Render variable names: BOT_TOKEN, RCON_PASSWORD, CHANNEL_ID
 # -------------------------------------------------------------
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "").strip()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", os.getenv("BOT_TOKEN", "")).strip()
+BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
+
 RCON_HOST = os.getenv("RCON_HOST", "167.114.174.145").strip()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
-WEB_PORT = int(os.getenv("PORT", "10000"))  # Default Render HTTP port
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("RCON_PASSWORD", "")).strip()
+WEB_PORT = int(os.getenv("PORT", "10000"))  # Render web server port
 
 # SFTP / PalDefender Log Settings
 SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip()
@@ -32,7 +35,10 @@ SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
 SFTP_USER = os.getenv("SFTP_USER", "").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", "").strip()
 SFTP_LOG_PATH = os.getenv("SFTP_LOG_PATH", "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip()
-DISCORD_CHAT_CHANNEL_ID = int(os.getenv("DISCORD_CHAT_CHANNEL_ID", "0").strip() or "0")
+
+# Resolves DISCORD_CHAT_CHANNEL_ID or CHANNEL_ID from Render configuration
+_channel_val = os.getenv("DISCORD_CHAT_CHANNEL_ID", os.getenv("CHANNEL_ID", "0")).strip()
+DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 
 def get_rcon_port() -> int:
@@ -52,7 +58,7 @@ def get_rcon_port() -> int:
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
 # 3. RCON Helper Functions
@@ -60,7 +66,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def send_rcon_command(command: str) -> str:
     """Sends an RCON command to the Palworld server safely."""
     if not ADMIN_PASSWORD:
-        logger.error("ADMIN_PASSWORD environment variable is missing!")
+        logger.error("ADMIN_PASSWORD / RCON_PASSWORD environment variable is missing!")
         return ""
 
     try:
@@ -157,7 +163,7 @@ async def sftp_chat_listener_loop():
     await bot.wait_until_ready()
 
     if not DISCORD_CHAT_CHANNEL_ID or not SFTP_USER or not SFTP_PASSWORD:
-        logger.warning("💬 SFTP Chat Listener disabled: Missing SFTP_USER, SFTP_PASSWORD, or DISCORD_CHAT_CHANNEL_ID.")
+        logger.warning("💬 SFTP Chat Listener disabled: Missing SFTP_USER, SFTP_PASSWORD, or CHANNEL_ID/DISCORD_CHAT_CHANNEL_ID.")
         return
 
     channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
@@ -166,7 +172,7 @@ async def sftp_chat_listener_loop():
         return
 
     logger.info(f"📡 PalDefender SFTP Listener initialized! Monitoring: {SFTP_LOG_PATH}")
-    last_offset = -1  # Starts at end of file on boot to prevent spamming old log history
+    last_offset = -1  # Starts at end of file on boot to avoid spamming old history
 
     while not bot.is_closed():
         try:
@@ -174,7 +180,6 @@ async def sftp_chat_listener_loop():
             last_offset = new_offset
 
             for line in new_lines:
-                # Send non-empty chat lines into Discord
                 if line:
                     await channel.send(f"💬 `{line}`")
 
@@ -190,7 +195,7 @@ async def sftp_chat_listener_loop():
 async def on_ready():
     logger.info(f"✅ Discord Bot connected successfully as {bot.user} (ID: {bot.user.id})")
 
-    # Start the SFTP background task once on ready
+    # Start SFTP chat listener background loop
     if not getattr(bot, "sftp_task_started", False):
         bot.sftp_task_started = True
         bot.loop.create_task(sftp_chat_listener_loop())
@@ -247,10 +252,10 @@ async def start_web_server():
 # -------------------------------------------------------------
 async def main():
     if not DISCORD_TOKEN:
-        logger.critical("DISCORD_TOKEN environment variable is missing!")
+        logger.critical("DISCORD_TOKEN / BOT_TOKEN environment variable is missing!")
         sys.exit(1)
 
-    # Start dummy HTTP server for Render health checks
+    # Start HTTP server for Render health check ping
     await start_web_server()
 
     # Launch Discord Bot
@@ -266,3 +271,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"Fatal startup error: {e}")
         sys.exit(1)
+    
