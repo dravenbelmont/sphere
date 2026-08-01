@@ -21,30 +21,79 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 1. Environment & Configuration
+# 1. Environment & Configuration (Bulletproof Fallbacks)
 # -------------------------------------------------------------
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", os.getenv("BOT_TOKEN", "")).strip()
+DISCORD_TOKEN = (
+    os.getenv("DISCORD_TOKEN")
+    or os.getenv("BOT_TOKEN")
+    or os.getenv("DISCORD_BOT_TOKEN")
+    or ""
+).strip()
+
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
 
-RCON_HOST = os.getenv("RCON_HOST", "167.114.174.145").strip()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("RCON_PASSWORD", "")).strip()
-WEB_PORT = int(os.getenv("PORT", "10000"))
+RCON_HOST = (
+    os.getenv("RCON_HOST")
+    or os.getenv("SERVER_IP")
+    or "167.114.174.145"
+).strip()
 
-# Supabase Database URL (Pooled connection for IPv4/Render compatibility)
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+ADMIN_PASSWORD = (
+    os.getenv("ADMIN_PASSWORD")
+    or os.getenv("RCON_PASSWORD")
+    or os.getenv("SERVER_PASSWORD")
+    or ""
+).strip()
 
-# SFTP Settings
-SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip()
+WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "10000")))
+
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("SUPABASE_URL")
+    or os.getenv("POSTGRES_URL")
+    or ""
+).strip()
+
+SFTP_HOST = (
+    os.getenv("SFTP_HOST")
+    or os.getenv("SFTP_IP")
+    or RCON_HOST
+).strip()
+
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
-SFTP_USER = os.getenv("SFTP_USER", "").strip()
-SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", "").strip()
-SFTP_LOG_PATH = os.getenv("SFTP_LOG_PATH", "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip()
 
-_channel_val = os.getenv("DISCORD_CHAT_CHANNEL_ID", os.getenv("CHANNEL_ID", "0")).strip()
+SFTP_USER = (
+    os.getenv("SFTP_USER")
+    or os.getenv("SFTP_USERNAME")
+    or ""
+).strip()
+
+SFTP_PASSWORD = (
+    os.getenv("SFTP_PASSWORD")
+    or os.getenv("SFTP_PASS")
+    or ""
+).strip()
+
+SFTP_LOG_PATH = (
+    os.getenv("SFTP_LOG_PATH")
+    or os.getenv("LOG_PATH")
+    or "/Pal/Saved/SaveGames/PalDefender/Chat.log"
+).strip()
+
+_channel_val = (
+    os.getenv("DISCORD_CHAT_CHANNEL_ID")
+    or os.getenv("CHANNEL_ID")
+    or os.getenv("DISCORD_CHANNEL_ID")
+    or "0"
+).strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 def get_rcon_port() -> int:
-    port_str = os.getenv("RCON_PORT", "").strip()
+    port_str = (
+        os.getenv("RCON_PORT")
+        or os.getenv("ADMIN_PORT")
+        or ""
+    ).strip()
     return int(port_str) if port_str.isdigit() else 25575
 
 # -------------------------------------------------------------
@@ -52,7 +101,6 @@ def get_rcon_port() -> int:
 # -------------------------------------------------------------
 DAILY_REWARD_AMOUNT = 100
 
-# You can edit these Item IDs and Prices!
 SHOP_ITEMS = {
     "sphere": {"id": "PalSphere", "price": 10, "name": "Pal Sphere"},
     "megasphere": {"id": "PalSphere_Mega", "price": 30, "name": "Mega Sphere"},
@@ -327,7 +375,6 @@ async def buy(ctx, item_key: str, quantity: int = 1):
             await ctx.send(f"❌ You don't have enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
             return
 
-        # Attempt to give the item via RCON
         rcon_cmd = f"GiveItem {player_uid} {item['id']} {quantity}"
         resp, error = await send_rcon_command(rcon_cmd)
 
