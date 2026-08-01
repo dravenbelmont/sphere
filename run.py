@@ -145,7 +145,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Anti-IP Log Parser & SFTP Listener Loop
+# 5. Strict Zero-IP Log Parser & Persistent SFTP Loop
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
@@ -159,31 +159,36 @@ def parse_secure_log_line(line: str):
     """
     lower_line = line.lower()
 
-    # Extract platform ID (UserId=...)
-    userid_match = re.search(r"UserId=([^\s,\)]+)", line)
+    # Extract platform ID (UserId / UID / SteamId)
+    userid_match = re.search(r"(?:UserId|UID|SteamId)=([^\s,\)]+)", line, re.IGNORECASE)
     platform_id = userid_match.group(1) if userid_match else None
 
-    # Find valid player name from quotes, strictly ignoring IP addresses
+    # Find valid player name from quotes, strictly ignoring IP addresses and GUIDs
     quoted_strings = re.findall(r"['\"]([^'\"]+)['\"]", line)
     player_name = None
     for qs in quoted_strings:
-        # Ignore if string is an IP address
         if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', qs):
             continue
-        # Ignore if string is a UID/GUID
         if re.match(r'^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}', qs):
             continue
         player_name = qs
         break
 
+    # Fallback name extraction if no quotes matched a valid name
+    if not player_name:
+        match_raw = re.search(r'^([a-zA-Z0-9_\-\s]+)\s+(?:joined|left|connected|disconnected)', line, re.IGNORECASE)
+        if match_raw:
+            candidate = match_raw.group(1).strip()
+            if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', candidate):
+                player_name = candidate
+
     if not player_name:
         return None, None, None
 
-    # Classify event
-    if "chat:" in lower_line or ":global]" in lower_line or ":local]" in lower_line or ":guild]" in lower_line:
+    # Classify event type
+    if "chat:" in lower_line or ":global]" in lower_line or ":local]" in lower_line or ":guild]" in lower_line or "[admin]" in lower_line:
         parts = line.split("]: ")
         message = parts[-1].strip() if len(parts) > 1 else line.split(":")[-1].strip()
-        # Clean any accidental IP leakage from message text
         message = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[REDACTED]', message)
         return "CHAT", player_name, message
 
@@ -202,19 +207,23 @@ async def sftp_chat_listener_loop():
     channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
     if not channel: return
 
+    transport = None
+    sftp = None
+
     while not bot.is_closed():
         try:
-            def scan_logs():
-                global last_position, last_file_name
+            if transport is None or not transport.is_active():
+                logger.info("Connecting to SFTP server...")
                 transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
                 transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
                 sftp = paramiko.SFTPClient.from_transport(transport)
-                
-                files = sftp.listdir_attr(SFTP_LOG_PATH)
+                logger.info("SFTP connected successfully.")
+
+            def scan_logs_persistent(sftp_client):
+                global last_position, last_file_name
+                files = sftp_client.listdir_attr(SFTP_LOG_PATH)
                 log_files = [f for f in files if f.filename.endswith('.log')]
                 if not log_files:
-                    sftp.close()
-                    transport.close()
                     return []
                     
                 latest_file = sorted(log_files, key=lambda x: x.st_mtime, reverse=True)[0]
@@ -224,16 +233,14 @@ async def sftp_chat_listener_loop():
                     last_file_name = latest_file.filename
                     last_position = 0 
 
-                with sftp.open(full_file_path, "r") as f:
+                with sftp_client.open(full_file_path, "r") as f:
                     f.seek(last_position)
                     new_data = f.read().decode("utf-8", errors="replace")
                     last_position = f.tell()
 
-                sftp.close()
-                transport.close()
                 return [line.strip() for line in new_data.splitlines() if line.strip()]
 
-            new_lines = await asyncio.to_thread(scan_logs)
+            new_lines = await asyncio.to_thread(scan_logs_persistent, sftp)
             for line in new_lines:
                 event_type, name, data = parse_secure_log_line(line)
                 if event_type == "CHAT":
@@ -244,8 +251,19 @@ async def sftp_chat_listener_loop():
                 elif event_type == "LEAVE":
                     id_str = f" (ID: `{data}`)" if data else ""
                     await channel.send(f"🔴 **{name}** left the server.{id_str}")
+
         except Exception as e:
-            logger.error(f"SFTP Error: {e}")
+            logger.error(f"SFTP Error / Reconnecting: {e}")
+            if sftp:
+                try: sftp.close()
+                except: pass
+            if transport:
+                try: transport.close()
+                except: pass
+            transport = None
+            sftp = None
+            await asyncio.sleep(5)
+            continue
             
         await asyncio.sleep(3)
 
