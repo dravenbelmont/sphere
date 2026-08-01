@@ -3,10 +3,12 @@ import csv
 import logging
 import os
 import sys
+from datetime import datetime, timedelta
 from aiohttp import web
 import discord
 from discord.ext import commands
 import paramiko
+import asyncpg
 
 # -------------------------------------------------------------
 # Logging Setup
@@ -20,120 +22,112 @@ logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
 # 1. Environment & Configuration
-# Fits existing Render variable names: BOT_TOKEN, RCON_PASSWORD, CHANNEL_ID
 # -------------------------------------------------------------
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", os.getenv("BOT_TOKEN", "")).strip()
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
 
 RCON_HOST = os.getenv("RCON_HOST", "167.114.174.145").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("RCON_PASSWORD", "")).strip()
-WEB_PORT = int(os.getenv("PORT", "10000"))  # Render web server port
+WEB_PORT = int(os.getenv("PORT", "10000"))
 
-# SFTP / PalDefender Log Settings
+# Supabase Database URL (Pooled connection for IPv4/Render compatibility)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# SFTP Settings
 SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip()
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
 SFTP_USER = os.getenv("SFTP_USER", "").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", "").strip()
 SFTP_LOG_PATH = os.getenv("SFTP_LOG_PATH", "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip()
 
-# Resolves DISCORD_CHAT_CHANNEL_ID or CHANNEL_ID from Render configuration
 _channel_val = os.getenv("DISCORD_CHAT_CHANNEL_ID", os.getenv("CHANNEL_ID", "0")).strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
-
 def get_rcon_port() -> int:
-    """Safely converts RCON_PORT env var to int without crashing."""
     port_str = os.getenv("RCON_PORT", "").strip()
-    if not port_str:
-        return 25575  # Standard Palworld RCON port
-    try:
-        return int(port_str)
-    except ValueError:
-        logger.warning(f"Invalid RCON_PORT '{port_str}', defaulting to 25575")
-        return 25575
+    return int(port_str) if port_str.isdigit() else 25575
 
 # -------------------------------------------------------------
-# 2. Discord Bot Instance Initialization
+# 2. Economy & Shop Setup (Supabase / PostgreSQL)
+# -------------------------------------------------------------
+DAILY_REWARD_AMOUNT = 100
+
+# You can edit these Item IDs and Prices!
+SHOP_ITEMS = {
+    "sphere": {"id": "PalSphere", "price": 10, "name": "Pal Sphere"},
+    "megasphere": {"id": "PalSphere_Mega", "price": 30, "name": "Mega Sphere"},
+    "wood": {"id": "Wood", "price": 1, "name": "Wood"},
+    "stone": {"id": "Stone", "price": 1, "name": "Stone"},
+    "gold": {"id": "Money", "price": 5, "name": "Gold Coins"}
+}
+
+async def init_db():
+    """Initializes the PostgreSQL table in Supabase."""
+    if not DATABASE_URL:
+        logger.critical("DATABASE_URL environment variable is missing!")
+        return
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                discord_id BIGINT PRIMARY KEY,
+                player_uid TEXT,
+                balance INTEGER DEFAULT 0,
+                last_daily TIMESTAMP
+            )
+        ''')
+        await conn.close()
+        logger.info("✅ Connected to Supabase and verified database table.")
+    except Exception as e:
+        logger.critical(f"Failed to connect to Supabase: {e}")
+
+# -------------------------------------------------------------
+# 3. Discord Bot Init
 # -------------------------------------------------------------
 intents = discord.Intents.default()
 intents.message_content = True
-
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 3. RCON Helper Functions
+# 4. RCON Helpers
 # -------------------------------------------------------------
-async def send_rcon_command(command: str) -> str:
-    """Sends an RCON command to the Palworld server safely."""
+async def send_rcon_command(command: str) -> tuple[str | None, str | None]:
     if not ADMIN_PASSWORD:
-        logger.error("ADMIN_PASSWORD / RCON_PASSWORD environment variable is missing!")
-        return ""
-
+        return None, "RCON_PASSWORD / ADMIN_PASSWORD missing."
     try:
         from gamercon_async import GameRCON
         port = get_rcon_port()
         async with GameRCON(RCON_HOST, port, ADMIN_PASSWORD, timeout=10) as rcon:
             response = await rcon.send(command)
-            return response.strip()
+            return response.strip(), None
     except Exception as e:
-        logger.error(f"Failed to execute RCON command '{command}': {e}")
-        return ""
-
-
-async def get_online_players_rcon() -> list[dict]:
-    """Fetches online players via RCON 'ShowPlayers'."""
-    raw_response = await send_rcon_command("ShowPlayers")
-    if not raw_response:
-        return []
-
-    players = []
-    lines = [line.strip() for line in raw_response.splitlines() if line.strip()]
-
-    if len(lines) > 1:
-        reader = csv.DictReader(lines)
-        for row in reader:
-            name = row.get("name", "").strip()
-            uid = row.get("playeruid", "").strip()
-            steamid = row.get("steamid", "").strip()
-            if name:
-                players.append({"name": name, "playeruid": uid, "steamid": steamid})
-
-    return players
-
+        logger.error(f"RCON Error: {e}")
+        return None, str(e)
 
 async def broadcast_announcement_rcon(message: str) -> bool:
-    """Broadcasts an in-game message via RCON 'Broadcast'."""
     formatted_msg = message.replace(" ", "_")
-    response = await send_rcon_command(f"Broadcast {formatted_msg}")
-    return bool(response)
+    response, error = await send_rcon_command(f"Broadcast {formatted_msg}")
+    return bool(response and not error)
 
 # -------------------------------------------------------------
-# 4. SFTP PalDefender Chat Log Listener
+# 5. SFTP Chat Listener
 # -------------------------------------------------------------
 def fetch_new_chat_lines(last_offset: int) -> tuple[list[str], int]:
-    """Synchronous SFTP read run in a thread via asyncio.to_thread."""
     if not SFTP_USER or not SFTP_PASSWORD:
         return [], last_offset
-
-    transport = None
-    sftp = None
+    transport = sftp = None
     try:
         transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
         transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
         sftp = paramiko.SFTPClient.from_transport(transport)
-
-        # Get remote log size
+        
         stat = sftp.stat(SFTP_LOG_PATH)
         file_size = stat.st_size
-
-        # On initial boot (last_offset == -1) or log rotation, seek to end
         if last_offset == -1 or file_size < last_offset:
             return [], file_size
-
         if file_size == last_offset:
             return [], last_offset
 
-        # Read new bytes from last offset
         with sftp.open(SFTP_LOG_PATH, "r") as f:
             f.seek(last_offset)
             new_data = f.read().decode("utf-8", errors="replace")
@@ -141,101 +135,221 @@ def fetch_new_chat_lines(last_offset: int) -> tuple[list[str], int]:
 
         lines = [line.strip() for line in new_data.splitlines() if line.strip()]
         return lines, new_offset
-
     except Exception as e:
-        logger.debug(f"SFTP log poll exception: {e}")
         return [], last_offset
     finally:
-        if sftp:
-            try:
-                sftp.close()
-            except Exception:
-                pass
-        if transport:
-            try:
-                transport.close()
-            except Exception:
-                pass
-
+        if sftp: sftp.close()
+        if transport: transport.close()
 
 async def sftp_chat_listener_loop():
-    """Background task monitoring the PalDefender chat log file over SFTP."""
     await bot.wait_until_ready()
-
-    if not DISCORD_CHAT_CHANNEL_ID or not SFTP_USER or not SFTP_PASSWORD:
-        logger.warning("💬 SFTP Chat Listener disabled: Missing SFTP_USER, SFTP_PASSWORD, or CHANNEL_ID/DISCORD_CHAT_CHANNEL_ID.")
+    if not DISCORD_CHAT_CHANNEL_ID or not SFTP_USER:
         return
 
     channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
-    if not channel:
-        logger.error(f"💬 SFTP Listener Error: Could not find Discord Channel ID {DISCORD_CHAT_CHANNEL_ID}")
-        return
+    if not channel: return
 
-    logger.info(f"📡 PalDefender SFTP Listener initialized! Monitoring: {SFTP_LOG_PATH}")
-    last_offset = -1  # Starts at end of file on boot to avoid spamming old history
-
+    logger.info(f"📡 SFTP Listener Active: {SFTP_LOG_PATH}")
+    last_offset = -1
     while not bot.is_closed():
-        try:
-            new_lines, new_offset = await asyncio.to_thread(fetch_new_chat_lines, last_offset)
-            last_offset = new_offset
-
-            for line in new_lines:
-                if line:
-                    await channel.send(f"💬 `{line}`")
-
-        except Exception as e:
-            logger.error(f"Unexpected error in SFTP chat listener: {e}")
-
-        await asyncio.sleep(3)  # Poll SFTP every 3 seconds
+        new_lines, new_offset = await asyncio.to_thread(fetch_new_chat_lines, last_offset)
+        last_offset = new_offset
+        for line in new_lines:
+            if line: await channel.send(f"💬 `{line}`")
+        await asyncio.sleep(3)
 
 # -------------------------------------------------------------
-# 5. Discord Bot Events & Commands
+# 6. Discord Events & Standard Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
-    logger.info(f"✅ Discord Bot connected successfully as {bot.user} (ID: {bot.user.id})")
-
-    # Start SFTP chat listener background loop
+    await init_db()
+    logger.info(f"✅ Bot connected as {bot.user}")
     if not getattr(bot, "sftp_task_started", False):
         bot.sftp_task_started = True
         bot.loop.create_task(sftp_chat_listener_loop())
 
-
 @bot.command(name="players")
 async def list_players(ctx):
-    """Lists online players using RCON."""
-    players = await get_online_players_rcon()
+    raw_response, error = await send_rcon_command("ShowPlayers")
+    if error:
+        await ctx.send(
+            f"❌ **RCON Connection Error:**\n`{error}`\n\n"
+            "*(Please check your `RCON_PORT` and `RCON_PASSWORD` in Render environment settings.)*"
+        )
+        return
+    if not raw_response:
+        await ctx.send("🎮 Server responded, but data was empty.")
+        return
+
+    players = []
+    lines = [line.strip() for line in raw_response.splitlines() if line.strip()]
+    if len(lines) > 1:
+        reader = csv.DictReader(lines)
+        for row in reader:
+            if row.get("name"):
+                players.append(row)
 
     if not players:
-        await ctx.send("🎮 **Server Status:** No players currently online (or RCON unreachable).")
+        await ctx.send("🎮 **Server Status:** 0 players currently online.")
         return
 
     player_list = "\n".join([f"• **{p['name']}** (UID: `{p['playeruid']}`)" for p in players])
-
-    embed = discord.Embed(
-        title=f"Online Players ({len(players)})",
-        description=player_list,
-        color=discord.Color.green()
-    )
+    embed = discord.Embed(title=f"Online Players ({len(players)})", description=player_list, color=discord.Color.blue())
     await ctx.send(embed=embed)
-
 
 @bot.command(name="announce")
 @commands.has_permissions(administrator=True)
 async def announce_ingame(ctx, *, message: str):
-    """Sends a message to in-game players via RCON."""
     success = await broadcast_announcement_rcon(f"[Discord] {message}")
-    if success:
-        await ctx.send(f"✅ In-game broadcast sent: **{message}**")
-    else:
-        await ctx.send("❌ Failed to send in-game broadcast via RCON.")
+    await ctx.send(f"✅ Broadcast sent: **{message}**" if success else "❌ Failed to send broadcast.")
 
 # -------------------------------------------------------------
-# 6. Render HTTP Server
+# 7. Economy & Shop Commands (Supabase Backend)
+# -------------------------------------------------------------
+@bot.command(name="register")
+async def register(ctx, player_uid: str):
+    """Links your Discord account to your Palworld UID."""
+    if not DATABASE_URL:
+        await ctx.send("❌ Database is not configured.")
+        return
+    
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute('''
+            INSERT INTO users (discord_id, player_uid) 
+            VALUES ($1, $2) 
+            ON CONFLICT (discord_id) DO UPDATE SET player_uid = $2
+        ''', ctx.author.id, player_uid)
+        await ctx.send(f"✅ Registered! Your Discord is now linked to Palworld UID: `{player_uid}`")
+    except Exception as e:
+        logger.error(f"Database error on register: {e}")
+        await ctx.send("❌ An error occurred while registering.")
+    finally:
+        await conn.close()
+
+@bot.command(name="daily")
+async def daily(ctx):
+    """Claim your daily coins."""
+    if not DATABASE_URL:
+        await ctx.send("❌ Database is not configured.")
+        return
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        row = await conn.fetchrow('SELECT balance, last_daily FROM users WHERE discord_id = $1', ctx.author.id)
+            
+        if not row:
+            await ctx.send("❌ You need to `!register <PlayerUID>` first!")
+            return
+            
+        balance, last_daily = row
+        now = datetime.utcnow()
+        
+        if last_daily:
+            if now < last_daily + timedelta(days=1):
+                wait_time = (last_daily + timedelta(days=1)) - now
+                hours, remainder = divmod(wait_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                await ctx.send(f"⏳ You must wait {hours}h {minutes}m before claiming your next daily.")
+                return
+
+        new_balance = balance + DAILY_REWARD_AMOUNT
+        await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE discord_id = $3', 
+                         new_balance, now, ctx.author.id)
+        await ctx.send(f"🎁 You claimed your daily reward of **{DAILY_REWARD_AMOUNT} coins**! New balance: **{new_balance}**.")
+    except Exception as e:
+        logger.error(f"Database error on daily: {e}")
+        await ctx.send("❌ An error occurred processing your daily reward.")
+    finally:
+        await conn.close()
+
+@bot.command(name="balance")
+async def balance(ctx):
+    """Check your coin balance."""
+    if not DATABASE_URL:
+        await ctx.send("❌ Database is not configured.")
+        return
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        row = await conn.fetchrow('SELECT balance FROM users WHERE discord_id = $1', ctx.author.id)
+        if row:
+            await ctx.send(f"💰 You have **{row['balance']} coins**.")
+        else:
+            await ctx.send("❌ You are not registered. Use `!register <PlayerUID>`.")
+    except Exception as e:
+        logger.error(f"Database error on balance: {e}")
+        await ctx.send("❌ An error occurred fetching your balance.")
+    finally:
+        await conn.close()
+
+@bot.command(name="shop")
+async def shop(ctx):
+    """Displays items available for purchase."""
+    embed = discord.Embed(title="🛒 Chillet & Chill Shop", color=discord.Color.gold())
+    for key, item in SHOP_ITEMS.items():
+        embed.add_field(name=f"{item['name']} (`{key}`)", value=f"Price: **{item['price']} coins**", inline=False)
+    embed.set_footer(text="Use !buy <item> <quantity> to purchase!")
+    await ctx.send(embed=embed)
+
+@bot.command(name="buy")
+async def buy(ctx, item_key: str, quantity: int = 1):
+    """Buy items from the shop."""
+    if not DATABASE_URL:
+        await ctx.send("❌ Database is not configured.")
+        return
+
+    item_key = item_key.lower()
+    if item_key not in SHOP_ITEMS:
+        await ctx.send("❌ Item not found. Check `!shop` for available items.")
+        return
+        
+    if quantity <= 0:
+        await ctx.send("❌ Quantity must be at least 1.")
+        return
+
+    item = SHOP_ITEMS[item_key]
+    total_cost = item['price'] * quantity
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        row = await conn.fetchrow('SELECT player_uid, balance FROM users WHERE discord_id = $1', ctx.author.id)
+            
+        if not row:
+            await ctx.send("❌ You are not registered. Use `!register <PlayerUID>`.")
+            return
+            
+        player_uid = row['player_uid']
+        current_balance = row['balance']
+
+        if current_balance < total_cost:
+            await ctx.send(f"❌ You don't have enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
+            return
+
+        # Attempt to give the item via RCON
+        rcon_cmd = f"GiveItem {player_uid} {item['id']} {quantity}"
+        resp, error = await send_rcon_command(rcon_cmd)
+
+        if error:
+            await ctx.send(f"❌ Failed to deliver items. RCON Error: `{error}`")
+            return
+            
+        new_balance = current_balance - total_cost
+        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
+        
+        await ctx.send(f"✅ Successfully bought {quantity}x **{item['name']}**! They have been sent to your inventory. Remaining balance: **{new_balance}**.")
+    except Exception as e:
+        logger.error(f"Database error on buy: {e}")
+        await ctx.send("❌ An error occurred processing your purchase.")
+    finally:
+        await conn.close()
+
+# -------------------------------------------------------------
+# 8. Web Server & Main Loop
 # -------------------------------------------------------------
 async def health_check_handler(request):
     return web.Response(text="OK - Palworld Bot is active")
-
 
 async def start_web_server():
     app = web.Application()
@@ -245,30 +359,17 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", WEB_PORT)
     await site.start()
-    logger.info(f"🌐 Health check web server running on port {WEB_PORT}")
 
-# -------------------------------------------------------------
-# 7. Main Execution Loop
-# -------------------------------------------------------------
 async def main():
     if not DISCORD_TOKEN:
-        logger.critical("DISCORD_TOKEN / BOT_TOKEN environment variable is missing!")
+        logger.critical("DISCORD_TOKEN missing!")
         sys.exit(1)
-
-    # Start HTTP server for Render health check ping
     await start_web_server()
-
-    # Launch Discord Bot
     async with bot:
         await bot.start(DISCORD_TOKEN)
-
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Bot manually stopped.")
-    except Exception as e:
-        logger.critical(f"Fatal startup error: {e}")
-        sys.exit(1)
-    
