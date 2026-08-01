@@ -229,7 +229,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Fixed Automated Login Daily Reward & Player Tracking Loop
+# 5. Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
@@ -302,6 +302,8 @@ async def poll_palworld_players_loop():
                         known_online_players = current_ids
                         is_players_initialized = True
                         logger.info(f"Initialized player tracker. Currently online players: {len(current_ids)}")
+                        for pid, pname in current_players_map.items():
+                            asyncio.create_task(process_login_daily(pid, pname))
                     else:
                         joined_ids = current_ids - known_online_players
                         left_ids = known_online_players - current_ids
@@ -362,7 +364,48 @@ async def playtime_reward_loop():
             logger.error(f"Playtime loop error: {e}")
 
 # -------------------------------------------------------------
-# 6. Shop Pagination View UI
+# 6. Automated Background Restart & Save Loop
+# -------------------------------------------------------------
+async def automated_restart_loop():
+    await bot.wait_until_ready()
+    # Configure restart interval (Default: every 6 hours)
+    RESTART_INTERVAL_HOURS = 6
+    
+    while not bot.is_closed():
+        await asyncio.sleep(RESTART_INTERVAL_HOURS * 3600)
+        if not RCON_HOST or not ADMIN_PASSWORD: continue
+        
+        try:
+            logger.info("Starting automated server restart sequence...")
+            total_countdown = 300 # 5 minutes warning total
+            
+            # 1. Broadcast initial restart warning
+            async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+                await rcon.send(f"Broadcast Automated_server_restart_in_{total_countdown}_seconds!")
+            
+            # 2. Wait until exactly 1 minute remains
+            sleep_duration = total_countdown - 60
+            await asyncio.sleep(sleep_duration)
+            
+            # 3. Automatically save the server 1 minute before restart
+            logger.info("Executing automatic world save 1 minute before restart...")
+            async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+                await rcon.send("Save")
+                await rcon.send("Broadcast Server_world_saved._Shutting_down_in_60_seconds!")
+            
+            # 4. Wait the final 60 seconds
+            await asyncio.sleep(60)
+            
+            # 5. Clean shutdown
+            async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+                await rcon.send("Shutdown 1 Automated_Restart_Shutdown")
+            
+            logger.info("Automated restart sequence completed successfully. World was safely saved 1 minute prior.")
+        except Exception as e:
+            logger.error(f"Automated restart loop error: {e}")
+
+# -------------------------------------------------------------
+# 7. Shop Pagination View UI
 # -------------------------------------------------------------
 class ShopPaginator(discord.ui.View):
     def __init__(self, items_list, author_id):
@@ -398,7 +441,7 @@ class ShopPaginator(discord.ui.View):
         else: await interaction.response.defer()
 
 # -------------------------------------------------------------
-# 7. Discord Commands & Event Listeners
+# 8. Discord Commands & Event Listeners
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -408,6 +451,7 @@ async def on_ready():
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
         bot.loop.create_task(playtime_reward_loop())
+        bot.loop.create_task(automated_restart_loop())
 
 @bot.event
 async def on_message(message):
@@ -519,8 +563,22 @@ async def buy(ctx, item_key: str, quantity: int = 1):
     finally:
         await conn.close()
 
+@bot.command(name="save")
+@commands.has_permissions(administrator=True)
+async def server_save(ctx):
+    if not RCON_HOST or not ADMIN_PASSWORD:
+        return await ctx.send("❌ RCON configuration missing.")
+    try:
+        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            res = await rcon.send("Save")
+            logger.info(f"RCON Save response: {res}")
+        await ctx.send("💾 Server world saved successfully!")
+    except Exception as e:
+        logger.error(f"Save command failed: {e}")
+        await ctx.send(f"❌ Failed to save server: {e}")
+
 # -------------------------------------------------------------
-# 8. Web Server & Main
+# 9. Web Server & Main
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
