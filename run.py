@@ -6,6 +6,8 @@ import posixpath
 import asyncio
 import threading
 import traceback
+import datetime
+from zoneinfo import ZoneInfo
 import aiohttp
 import paramiko
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -15,6 +17,9 @@ from gamercon_async import GameRCON
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Set Server Timezone to Eastern Time (EST/EDT)
+EST_TZ = ZoneInfo("America/New_York")
 
 # ---------------------------------------------------------
 # Helper: Clean Markdown Links & Extra Formatting from Env Vars
@@ -81,6 +86,9 @@ SFTP_USER = clean_env_var(os.environ.get("SFTP_USER"))
 SFTP_PASS = clean_env_var(os.environ.get("SFTP_PASSWORD"))
 SFTP_LOG_PATH = clean_env_var(os.environ.get("SFTP_LOG_PATH"))
 
+# Discord Invite Link for in-game promo broadcasts
+DISCORD_INVITE_URL = clean_env_var(os.environ.get("DISCORD_INVITE_URL")) or "https://discord.gg/mVbdCCFHGp"
+
 if not TOKEN:
     print("[FATAL ERROR] No Discord bot token found!", file=sys.stderr, flush=True)
     sys.exit(1)
@@ -99,6 +107,16 @@ last_log_offset = 0
 PALDEFENDER_CHAT_REGEX = re.compile(
     r"\[Chat::\w+\]\['(?P<player>[^']+)'[^\]]*\](?:\[[^\]]+\])*:\s*(?P<message>.*)"
 )
+
+# Tracking state keys to prevent duplicate announcements within the same minute
+last_warning_key = ""
+last_restart_key = ""
+last_promo_key = ""
+
+# EST Restart Hours (12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM)
+RESTART_HOURS = [0, 4, 8, 12, 16, 20]
+# EST Pre-Warning Hours (11 PM, 3 AM, 7 AM, 11 AM, 3 PM, 7 PM)
+WARNING_HOURS = [23, 3, 7, 11, 15, 19]
 
 # ---------------------------------------------------------
 # 3. REST API Helper Functions
@@ -144,7 +162,7 @@ async def send_palworld_announce(message_text: str) -> bool:
         return False
 
 # ---------------------------------------------------------
-# 4. Background Tasks (Players & SFTP Chat Tailer)
+# 4. Background Tasks & Auto-Recovery
 # ---------------------------------------------------------
 @tasks.loop(minutes=2)
 async def check_server_status():
@@ -165,8 +183,11 @@ async def poll_sftp_chat():
     def _read_remote_log():
         global current_log_file, last_log_offset
         new_lines = []
+        transport = None
+        
         try:
             transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+            transport.banner_timeout = 5
             transport.connect(username=SFTP_USER, password=SFTP_PASS)
             sftp = paramiko.SFTPClient.from_transport(transport)
 
@@ -208,9 +229,14 @@ async def poll_sftp_chat():
 
             finally:
                 sftp.close()
-                transport.close()
-        except Exception as e:
-            print(f"[SFTP ERROR] {e}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
+        finally:
+            if transport:
+                try:
+                    transport.close()
+                except Exception:
+                    pass
 
         return new_lines
 
@@ -234,6 +260,47 @@ async def poll_sftp_chat():
                     clean_line = re.sub(r'^\s*\[.*?\]\s*', '', line).strip()
                     await channel.send(f"💬 **[Game Chat]** {clean_line if clean_line else line}")
 
+@poll_sftp_chat.error
+async def poll_sftp_chat_error(error):
+    print(f"[SFTP TASK RECOVERING] Encountered error: {error}. Retrying...", flush=True)
+    await asyncio.sleep(5)
+    if not poll_sftp_chat.is_running():
+        poll_sftp_chat.start()
+
+# ---------------------------------------------------------
+# Automated EST Schedule: Restarts, Warnings, & Discord Promo
+# ---------------------------------------------------------
+@tasks.loop(seconds=20)
+async def restart_scheduler():
+    global last_warning_key, last_restart_key, last_promo_key
+    
+    # Always evaluate time in EST/EDT
+    now = datetime.datetime.now(EST_TZ)
+    current_key = f"{now.day}-{now.hour}-{now.minute}"
+
+    # 1. 10-Minute Pre-Restart Warning (e.g. 11:50 PM, 3:50 AM, 7:50 AM EST)
+    if now.hour in WARNING_HOURS and now.minute == 50:
+        if last_warning_key != current_key:
+            last_warning_key = current_key
+            warning_msg = "⚠️ SERVER NOTICE: Server restart scheduled in 10 minutes! Please find a safe spot."
+            print(f"[EST SCHEDULE] Sending 10-min restart warning...", flush=True)
+            await send_palworld_announce(warning_msg)
+
+    # 2. Exact Restart Hour Exit (e.g. 12:00 AM, 4:00 AM, 8:00 AM EST)
+    if now.hour in RESTART_HOURS and now.minute == 0:
+        if last_restart_key != current_key:
+            last_restart_key = current_key
+            print(f"[EST SCHEDULE] Restart hour reached ({now.strftime('%I:%M %p EST')}). Restarting bot...", flush=True)
+            sys.exit(0) # Render auto-restarts the bot process
+
+    # 3. 2-Hour Discord Invite Broadcast (Runs at the :30 minute mark every 2 hours)
+    if now.hour % 2 == 0 and now.minute == 30:
+        if last_promo_key != current_key:
+            last_promo_key = current_key
+            promo_msg = f"📢 Join our Discord community for news, updates & trading! {DISCORD_INVITE_URL}"
+            print(f"[EST SCHEDULE] Sending 2-hour Discord promo broadcast...", flush=True)
+            await send_palworld_announce(promo_msg)
+
 # ---------------------------------------------------------
 # 5. Events & Commands
 # ---------------------------------------------------------
@@ -241,9 +308,12 @@ async def poll_sftp_chat():
 async def on_ready():
     print(f"==========================================", flush=True)
     print(f" SUCCESS: Bot logged in as {bot.user}", flush=True)
+    print(f" Timezone: EST (America/New_York)", flush=True)
     print(f" Monitoring Channel ID: {CHANNEL_ID or 'NOT SET'}", flush=True)
+    print(f" Discord Invite Link: {DISCORD_INVITE_URL}", flush=True)
     print(f" Target REST API: {REST_API_URL}", flush=True)
     print(f" SFTP Log Monitoring: {'ENABLED' if SFTP_USER and SFTP_LOG_PATH else 'DISABLED (Missing Credentials)'}", flush=True)
+    print(f" EST Schedule (Restarts + 2-Hour Discord Promo): ACTIVE", flush=True)
     print(f"==========================================", flush=True)
     
     if not check_server_status.is_running():
@@ -251,6 +321,9 @@ async def on_ready():
         
     if not poll_sftp_chat.is_running() and SFTP_USER and SFTP_LOG_PATH:
         poll_sftp_chat.start()
+
+    if not restart_scheduler.is_running():
+        restart_scheduler.start()
 
 @bot.command(name="players")
 async def list_players(ctx):
