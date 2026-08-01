@@ -9,7 +9,7 @@ from discord.ext import commands
 import paramiko
 import asyncpg
 import aiohttp
-from gamercon_async import GameRCON  # RCON library for injecting items
+from gamercon_async import GameRCON
 
 # -------------------------------------------------------------
 # Logging Setup
@@ -35,30 +35,81 @@ SFTP_HOST = (os.getenv("SFTP_HOST") or "").strip().strip("[]()").strip()
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
 SFTP_USER = (os.getenv("SFTP_USER") or "").strip().strip("[]()").strip()
 SFTP_PASSWORD = (os.getenv("SFTP_PASSWORD") or "").strip().strip("[]()").strip()
-SFTP_LOG_PATH = (os.getenv("SFTP_LOG_PATH") or "/Pal/Saved/SaveGames/PalDefender/Chat.log").strip().strip("[]()").strip()
+SFTP_LOG_PATH = (os.getenv("SFTP_LOG_PATH") or "/server-data/Pal/Binaries/Win64/PalDefender/Logs").strip().strip("[]()").strip()
 
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
-# RCON specific for giving items
 RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
 
 # -------------------------------------------------------------
-# 2. Economy & Balanced Vanilla Shop
+# 2. Economy & Categorized Full Shop Catalog
 # -------------------------------------------------------------
-DAILY_REWARD_AMOUNT = 100
+DAILY_REWARD_AMOUNT = 500
 
-# Perfectly balanced around a 100 coin/day economy. No Dev items.
 SHOP_ITEMS = {
-    "wood": {"id": "Wood", "price": 5, "name": "Wood (x50)", "amount": 50},
-    "stone": {"id": "Stone", "price": 5, "name": "Stone (x50)", "amount": 50},
-    "paldium": {"id": "Pal_crystal", "price": 10, "name": "Paldium Fragment (x20)", "amount": 20},
-    "ingot": {"id": "CopperIngot", "price": 25, "name": "Ingot (x20)", "amount": 20},
-    "sphere": {"id": "PalSphere", "price": 5, "name": "Pal Sphere (x5)", "amount": 5},
-    "megasphere": {"id": "PalSphere_Mega", "price": 15, "name": "Mega Sphere (x5)", "amount": 5},
-    "gigasphere": {"id": "PalSphere_Giga", "price": 30, "name": "Giga Sphere (x5)", "amount": 5},
-    "cake": {"id": "Cake", "price": 50, "name": "Cake (x1)", "amount": 1},
-    "gold": {"id": "Money", "price": 20, "name": "Gold Coins (x500)", "amount": 500}
+    # === SPHERES ===
+    "palsphere": {"name": "Pal Sphere", "rcon_id": "PalSphere", "price": 100, "category": "Spheres"},
+    "megasphere": {"name": "Mega Sphere", "rcon_id": "PalSphere_Mega", "price": 300, "category": "Spheres"},
+    "gigasphere": {"name": "Giga Sphere", "rcon_id": "PalSphere_Giga", "price": 800, "category": "Spheres"},
+    "hypersphere": {"name": "Hyper Sphere", "rcon_id": "PalSphere_Master", "price": 1500, "category": "Spheres"},
+    "ultrasphere": {"name": "Ultra Sphere", "rcon_id": "PalSphere_Exotic", "price": 3000, "category": "Spheres"},
+    "legendarysphere": {"name": "Legendary Sphere", "rcon_id": "PalSphere_Legend", "price": 5000, "category": "Spheres"},
+
+    # === BASIC MATERIALS ===
+    "wood": {"name": "Wood", "rcon_id": "Wood", "price": 10, "category": "Basic Materials"},
+    "stone": {"name": "Stone", "rcon_id": "Stone", "price": 10, "category": "Basic Materials"},
+    "fiber": {"name": "Fiber", "rcon_id": "Fiber", "price": 10, "category": "Basic Materials"},
+    "paldium": {"name": "Paldium Fragment", "rcon_id": "Pal_crystal", "price": 20, "category": "Basic Materials"},
+    "leather": {"name": "Leather", "rcon_id": "Leather", "price": 50, "category": "Basic Materials"},
+    "bone": {"name": "Bone", "rcon_id": "Bone", "price": 50, "category": "Basic Materials"},
+    "horn": {"name": "Horn", "rcon_id": "Horn", "price": 50, "category": "Basic Materials"},
+    "wool": {"name": "Wool", "rcon_id": "Wool", "price": 20, "category": "Basic Materials"},
+    "palfluids": {"name": "Pal Fluids", "rcon_id": "PalFluid", "price": 100, "category": "Basic Materials"},
+    "paloil": {"name": "High Quality Pal Oil", "rcon_id": "PalOil", "price": 150, "category": "Basic Materials"},
+    "flameorgan": {"name": "Flame Organ", "rcon_id": "FireOrgan", "price": 100, "category": "Basic Materials"},
+    "iceorgan": {"name": "Ice Organ", "rcon_id": "IceOrgan", "price": 100, "category": "Basic Materials"},
+    "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 100, "category": "Basic Materials"},
+    "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 100, "category": "Basic Materials"},
+
+    # === ORES & INGOTS ===
+    "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 50, "category": "Ores & Ingots"},
+    "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 100, "category": "Ores & Ingots"},
+    "coal": {"name": "Coal", "rcon_id": "Coal", "price": 100, "category": "Ores & Ingots"},
+    "refinedingot": {"name": "Refined Ingot", "rcon_id": "IronIngot", "price": 250, "category": "Ores & Ingots"},
+    "sulfur": {"name": "Sulfur", "rcon_id": "Sulfur", "price": 150, "category": "Ores & Ingots"},
+    "quartz": {"name": "Pure Quartz", "rcon_id": "Quartz", "price": 200, "category": "Ores & Ingots"},
+    "palmetal": {"name": "Pal Metal Ingot", "rcon_id": "StealIngot", "price": 500, "category": "Ores & Ingots"},
+
+    # === ADVANCED MATERIALS ===
+    "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 300, "category": "Advanced Materials"},
+    "carbonfiber": {"name": "Carbon Fiber", "rcon_id": "CarbonFiber", "price": 400, "category": "Advanced Materials"},
+    "cement": {"name": "Cement", "rcon_id": "Cement", "price": 150, "category": "Advanced Materials"},
+    "circuitboard": {"name": "Circuit Board", "rcon_id": "MachinePart", "price": 500, "category": "Advanced Materials"},
+
+    # === AMMUNITION ===
+    "arrow": {"name": "Arrow", "rcon_id": "Arrow", "price": 10, "category": "Ammunition"},
+    "firearrow": {"name": "Fire Arrow", "rcon_id": "FireArrow", "price": 20, "category": "Ammunition"},
+    "poisonarrow": {"name": "Poison Arrow", "rcon_id": "PoisonArrow", "price": 20, "category": "Ammunition"},
+    "coarseammo": {"name": "Coarse Ammo", "rcon_id": "RoughBullet", "price": 30, "category": "Ammunition"},
+    "handgunammo": {"name": "Handgun Ammo", "rcon_id": "HandgunBullet", "price": 50, "category": "Ammunition"},
+    "rifleammo": {"name": "Rifle Ammo", "rcon_id": "RifleBullet", "price": 100, "category": "Ammunition"},
+    "shotgunammo": {"name": "Shotgun Shells", "rcon_id": "ShotgunBullet", "price": 120, "category": "Ammunition"},
+    "assaultammo": {"name": "Assault Rifle Ammo", "rcon_id": "AssaultRifleBullet", "price": 150, "category": "Ammunition"},
+    "rocketammo": {"name": "Rocket Ammo", "rcon_id": "ExplosiveBullet", "price": 1000, "category": "Ammunition"},
+
+    # === MEDICINE ===
+    "lowmeds": {"name": "Low Grade Medical Supplies", "rcon_id": "Herb", "price": 200, "category": "Medicine"},
+    "meds": {"name": "Medical Supplies", "rcon_id": "Medicines", "price": 500, "category": "Medicine"},
+    "highmeds": {"name": "High Grade Medical Supplies", "rcon_id": "LuxuryMedicines", "price": 1000, "category": "Medicine"},
+
+    # === FOOD ===
+    "berries": {"name": "Red Berries", "rcon_id": "Berry", "price": 10, "category": "Food"},
+    "egg": {"name": "Egg", "rcon_id": "Egg", "price": 30, "category": "Food"},
+    "milk": {"name": "Milk", "rcon_id": "Milk", "price": 50, "category": "Food"},
+    "wheat": {"name": "Wheat", "rcon_id": "Wheat", "price": 20, "category": "Food"},
+    "bread": {"name": "Bread", "rcon_id": "Bread", "price": 100, "category": "Food"},
+    "honey": {"name": "Honey", "rcon_id": "Honey", "price": 100, "category": "Food"}
 }
 
 async def init_db():
@@ -88,7 +139,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 4. Palworld REST API Helpers (For Status/Players)
+# 4. Palworld REST API Helpers
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -108,54 +159,61 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200: return await response.json(), None
                     else: return None, f"HTTP {response.status}: {await response.text()}"
-            elif method == "POST":
-                async with session.post(url, json=payload, timeout=10) as response:
-                    if response.status == 200: return await response.json(), None
-                    else: return None, f"HTTP {response.status}: {await response.text()}"
     except Exception as e:
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. SFTP Chat Listener
+# 5. SFTP Chat Listener (Multi-Log Directory Scanner)
 # -------------------------------------------------------------
-def fetch_new_chat_lines(last_offset: int) -> tuple[list[str], int]:
-    if not SFTP_USER or not SFTP_PASSWORD or not SFTP_HOST: return [], last_offset
-    transport = sftp = None
-    try:
-        transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-        transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        
-        stat = sftp.stat(SFTP_LOG_PATH)
-        file_size = stat.st_size
-        if last_offset == -1 or file_size < last_offset: return [], file_size
-        if file_size == last_offset: return [], last_offset
-
-        with sftp.open(SFTP_LOG_PATH, "r") as f:
-            f.seek(last_offset)
-            new_data = f.read().decode("utf-8", errors="replace")
-            new_offset = f.tell()
-
-        lines = [line.strip() for line in new_data.splitlines() if line.strip()]
-        return lines, new_offset
-    except: return [], last_offset
-    finally:
-        if sftp: sftp.close()
-        if transport: transport.close()
+last_position = 0 
+last_file_name = None
 
 async def sftp_chat_listener_loop():
+    global last_position, last_file_name
     await bot.wait_until_ready()
     if not DISCORD_CHAT_CHANNEL_ID or not SFTP_USER: return
     channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
     if not channel: return
 
-    logger.info(f"📡 SFTP Listener Active: {SFTP_LOG_PATH}")
-    last_offset = -1
+    logger.info(f"📡 SFTP Listener Active Directory: {SFTP_LOG_PATH}")
     while not bot.is_closed():
-        new_lines, new_offset = await asyncio.to_thread(fetch_new_chat_lines, last_offset)
-        last_offset = new_offset
-        for line in new_lines:
-            if line: await channel.send(f"💬 `{line}`")
+        try:
+            def scan_logs():
+                global last_position, last_file_name
+                transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+                transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
+                sftp = paramiko.SFTPClient.from_transport(transport)
+                
+                files = sftp.listdir_attr(SFTP_LOG_PATH)
+                log_files = [f for f in files if f.filename.endswith('.log')]
+                if not log_files:
+                    sftp.close()
+                    transport.close()
+                    return []
+                    
+                latest_file = sorted(log_files, key=lambda x: x.st_mtime, reverse=True)[0]
+                full_file_path = f"{SFTP_LOG_PATH}/{latest_file.filename}"
+
+                if last_file_name != latest_file.filename:
+                    last_file_name = latest_file.filename
+                    last_position = 0 
+
+                with sftp.open(full_file_path, "r") as f:
+                    f.seek(last_position)
+                    new_data = f.read().decode("utf-8", errors="replace")
+                    last_position = f.tell()
+
+                sftp.close()
+                transport.close()
+                return [line.strip() for line in new_data.splitlines() if line.strip()]
+
+            new_lines = await asyncio.to_thread(scan_logs)
+            for line in new_lines:
+                if "Chat:" in line:
+                    await channel.send(f"💬 `{line}`")
+        except Exception as e:
+            logger.error(f"SFTP Error: {e}")
+            
         await asyncio.sleep(3)
 
 # -------------------------------------------------------------
@@ -243,11 +301,25 @@ async def balance(ctx):
 
 @bot.command(name="shop")
 async def shop(ctx):
-    """Displays items available for purchase."""
-    embed = discord.Embed(title="🛒 Chillet & Chill Supply Shop", description="Use `!daily` to get coins, then `!buy <item>` to have it delivered in-game!", color=discord.Color.gold())
-    for key, item in SHOP_ITEMS.items():
-        embed.add_field(name=f"{item['name']} (`{key}`)", value=f"Price: **{item['price']} coins**", inline=False)
-    embed.set_footer(text="Use !buy <item> <quantity> to purchase!")
+    """Displays categorized items available for purchase."""
+    embed = discord.Embed(
+        title="🛒 Palworld Server Shop",
+        description="Use `!buy <item_id> <quantity>` to have items delivered directly in-game!",
+        color=discord.Color.blue()
+    )
+
+    categories = {}
+    for item_id, item_data in SHOP_ITEMS.items():
+        cat = item_data.get("category", "Other")
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(f"`{item_id}` - {item_data['name']} (🪙 {item_data['price']})")
+
+    for cat, items in categories.items():
+        field_value = "\n".join(items)
+        embed.add_field(name=f"**{cat}**", value=field_value, inline=False)
+
+    embed.set_footer(text="Use !buy <item_id> <quantity> to purchase!")
     await ctx.send(embed=embed)
 
 @bot.command(name="buy")
@@ -264,13 +336,12 @@ async def buy(ctx, item_key: str, quantity: int = 1):
 
     item = SHOP_ITEMS[item_key]
     total_cost = item['price'] * quantity
-    total_amount_in_game = item['amount'] * quantity
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         row = await conn.fetchrow('SELECT player_uid, balance FROM users WHERE discord_id = $1', ctx.author.id)
         if not row:
-            await ctx.send("❌ You are not registered. Use `!register <PlayerUID>`.")
+            await ctx.send("❌ You are not registered. Use `!register <PlayerUID>` first.")
             return
             
         player_uid = row['player_uid']
@@ -280,23 +351,22 @@ async def buy(ctx, item_key: str, quantity: int = 1):
             await ctx.send(f"❌ Not enough coins! This costs **{total_cost}**, but you only have **{current_balance}**.")
             return
 
-        # 1. Attempt to give the item in-game via RCON BEFORE deducting coins
+        # 1. Attempt to give the item in-game via RCON
         try:
             async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-                # 'give' is the standard command for Palguard/Server-Commands mods
-                rcon_command = f"give {player_uid} {item['id']} {total_amount_in_game}"
+                rcon_command = f"give {player_uid} {item['rcon_id']} {quantity}"
                 logger.info(f"Executing RCON: {rcon_command}")
                 await rcon.send(rcon_command)
         except Exception as e:
             logger.error(f"RCON Error during buy: {e}")
-            await ctx.send(f"❌ **Delivery Failed:** Could not connect to the game server. Your coins were **not** deducted.\n*(Admin Note: Make sure the server has a mod like Palguard installed to support the `give` command, and that `RCON_PORT` is set in Render).*")
+            await ctx.send(f"❌ **Delivery Failed:** Could not connect to the game server via RCON. Your coins were **not** deducted.")
             return
 
-        # 2. If RCON succeeds, deduct the balance
+        # 2. Deduct balance upon successful RCON transmission
         new_balance = current_balance - total_cost
         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, ctx.author.id)
         
-        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**!\n🎁 *The items have been injected into your Palworld inventory!*\n💳 Deducted **{total_cost} coins**. Remaining: **{new_balance}**.")
+        await ctx.send(f"✅ Successfully purchased {quantity}x **{item['name']}**!\n🎁 *Injected into your in-game inventory via PalDefender!*\n💳 Deducted **{total_cost} coins**. Remaining: **{new_balance}**.")
     except Exception as e:
         logger.error(f"Database error on buy: {e}")
     finally:
