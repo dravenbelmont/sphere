@@ -1,5 +1,5 @@
-discord.py
-gamercon-async
-paramiko
-aiohttp
+discord.py[voice]
+davey
 asyncpg
+aiohttp
+gamercon-async
