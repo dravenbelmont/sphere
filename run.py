@@ -43,9 +43,10 @@ DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
 
 # -------------------------------------------------------------
-# 2. Economy & Categorized Full Shop Catalog (Legit Items, -75% Total Discount)
+# 2. Economy & Complete Version 1.0 Shop Catalog
 # -------------------------------------------------------------
 DAILY_REWARD_AMOUNT = 500
+PLAYTIME_REWARD_AMOUNT = 100  # Coins awarded per hour online
 
 SHOP_ITEMS = {
     # === SPHERES ===
@@ -55,6 +56,7 @@ SHOP_ITEMS = {
     "hypersphere": {"name": "Hyper Sphere", "rcon_id": "PalSphere_Master", "price": 375, "category": "Spheres"},
     "ultrasphere": {"name": "Ultra Sphere", "rcon_id": "PalSphere_Exotic", "price": 750, "category": "Spheres"},
     "legendarysphere": {"name": "Legendary Sphere", "rcon_id": "PalSphere_Legend", "price": 1250, "category": "Spheres"},
+    "ultimate_sphere": {"name": "Ultimate Sphere", "rcon_id": "PalSphere_Ultimate", "price": 2500, "category": "Spheres"},
 
     # === BASIC MATERIALS ===
     "wood": {"name": "Wood", "rcon_id": "Wood", "price": 1, "category": "Basic Materials"},
@@ -72,7 +74,7 @@ SHOP_ITEMS = {
     "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 25, "category": "Basic Materials"},
     "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 25, "category": "Basic Materials"},
 
-    # === ORES & INGOTS ===
+    # === ORES, INGOTS & 1.0 METALS ===
     "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 12, "category": "Ores & Ingots"},
     "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 25, "category": "Ores & Ingots"},
     "coal": {"name": "Coal", "rcon_id": "Coal", "price": 25, "category": "Ores & Ingots"},
@@ -80,6 +82,8 @@ SHOP_ITEMS = {
     "sulfur": {"name": "Sulfur", "rcon_id": "Sulfur", "price": 38, "category": "Ores & Ingots"},
     "quartz": {"name": "Pure Quartz", "rcon_id": "Quartz", "price": 50, "category": "Ores & Ingots"},
     "palmetal": {"name": "Pal Metal Ingot", "rcon_id": "StealIngot", "price": 125, "category": "Ores & Ingots"},
+    "plasteel": {"name": "Plasteel", "rcon_id": "Plasteel", "price": 250, "category": "Ores & Ingots"},
+    "soraliteingot": {"name": "Soralite Ingot", "rcon_id": "SoraliteIngot", "price": 350, "category": "Ores & Ingots"},
 
     # === ADVANCED MATERIALS ===
     "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 75, "category": "Advanced Materials"},
@@ -99,14 +103,18 @@ SHOP_ITEMS = {
     "assaultammo": {"name": "Assault Rifle Ammo", "rcon_id": "AssaultRifleBullet", "price": 38, "category": "Ammunition"},
     "rocketammo": {"name": "Rocket Ammo", "rcon_id": "ExplosiveBullet", "price": 250, "category": "Ammunition"},
     "energycartridge": {"name": "Energy Cartridge", "rcon_id": "EnergyCartridge", "price": 50, "category": "Ammunition"},
+    "plasteelammo": {"name": "Plasteel Ammo", "rcon_id": "PlasteelBullet", "price": 100, "category": "Ammunition"},
 
     # === WEAPONS ===
     "oldbow": {"name": "Old Bow", "rcon_id": "OldBow", "price": 125, "category": "Weapons"},
+    "mechanicalbow": {"name": "Mechanical Bow", "rcon_id": "MechanicalBow", "price": 750, "category": "Weapons"},
     "crossbow": {"name": "Crossbow", "rcon_id": "Crossbow", "price": 375, "category": "Weapons"},
     "handgun": {"name": "Handgun", "rcon_id": "Handgun", "price": 1250, "category": "Weapons"},
     "singleshotrifle": {"name": "Single-shot Rifle", "rcon_id": "Rifle", "price": 2000, "category": "Weapons"},
     "assaultrifle": {"name": "Assault Rifle", "rcon_id": "AssaultRifle", "price": 5000, "category": "Weapons"},
+    "combatsmg": {"name": "Combat SMG", "rcon_id": "CombatSMG", "price": 4500, "category": "Weapons"},
     "pumpactionshotgun": {"name": "Pump-action Shotgun", "rcon_id": "PumpActionShotgun", "price": 6250, "category": "Weapons"},
+    "laserrifle": {"name": "Laser Rifle", "rcon_id": "LaserRifle", "price": 10000, "category": "Weapons"},
     "rocketlauncher": {"name": "Rocket Launcher", "rcon_id": "RocketLauncher", "price": 18750, "category": "Weapons"},
 
     # === ARMOR & SHIELDS ===
@@ -115,6 +123,7 @@ SHOP_ITEMS = {
     "metalarmor": {"name": "Metal Armor", "rcon_id": "MetalArmor", "price": 1250, "category": "Armor & Shields"},
     "refinedmetalarmor": {"name": "Refined Metal Armor", "rcon_id": "RefinedMetalArmor", "price": 5000, "category": "Armor & Shields"},
     "palmetalarmor": {"name": "Pal Metal Armor", "rcon_id": "PalMetalArmor", "price": 20000, "category": "Armor & Shields"},
+    "plasteelarmor": {"name": "Plasteel Armor", "rcon_id": "PlasteelArmor", "price": 35000, "category": "Armor & Shields"},
     "megashield": {"name": "Mega Shield", "rcon_id": "MegaShield", "price": 750, "category": "Armor & Shields"},
     "gigashield": {"name": "Giga Shield", "rcon_id": "GigaShield", "price": 2500, "category": "Armor & Shields"},
     "hypershield": {"name": "Hyper Shield", "rcon_id": "HyperShield", "price": 7500, "category": "Armor & Shields"},
@@ -186,7 +195,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. SFTP Chat Listener
+# 5. Background Loops (SFTP Chat & Playtime Rewards)
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
@@ -239,6 +248,44 @@ async def sftp_chat_listener_loop():
             
         await asyncio.sleep(3)
 
+async def playtime_reward_loop():
+    """Awards coins hourly to players actively online on the server."""
+    await bot.wait_until_ready()
+    logger.info("⏰ Playtime Reward Loop Active (100 coins/hour)")
+    while not bot.is_closed():
+        await asyncio.sleep(3600)  # Runs every 1 hour
+        if not DATABASE_URL or not REST_API_URL:
+            continue
+            
+        try:
+            data, error = await call_palworld_api("/players", method="GET")
+            if error or not data:
+                continue
+                
+            players = data.get("players", [])
+            if not players:
+                continue
+                
+            conn = await asyncpg.connect(DATABASE_URL)
+            try:
+                for p in players:
+                    uid = p.get("playeruid", p.get("userId"))
+                    if not uid:
+                        continue
+                        
+                    row = await conn.fetchrow('SELECT discord_id, balance FROM users WHERE player_uid = $1', uid)
+                    if row:
+                        discord_id = row['discord_id']
+                        new_balance = row['balance'] + PLAYTIME_REWARD_AMOUNT
+                        await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_balance, discord_id)
+                        logger.info(f"Awarded {PLAYTIME_REWARD_AMOUNT} playtime coins to player UID {uid} (Discord ID: {discord_id})")
+            except Exception as db_err:
+                logger.error(f"Database error in playtime reward loop: {db_err}")
+            finally:
+                await conn.close()
+        except Exception as e:
+            logger.error(f"Error in playtime reward loop: {e}")
+
 # -------------------------------------------------------------
 # 6. Shop Pagination View UI
 # -------------------------------------------------------------
@@ -248,7 +295,7 @@ class ShopPaginator(discord.ui.View):
         self.items = items_list
         self.author_id = author_id
         self.current_page = 0
-        self.per_page = 8  # Keep fields safe under Discord limits
+        self.per_page = 8
         self.max_pages = (len(items_list) - 1) // self.per_page
 
     def get_embed(self):
@@ -299,9 +346,11 @@ class ShopPaginator(discord.ui.View):
 async def on_ready():
     await init_db()
     logger.info(f"✅ Bot connected as {bot.user}")
-    if not getattr(bot, "sftp_task_started", False):
-        bot.sftp_task_started = True
+    
+    if not getattr(bot, "tasks_started", False):
+        bot.tasks_started = True
         bot.loop.create_task(sftp_chat_listener_loop())
+        bot.loop.create_task(playtime_reward_loop())
 
 @bot.command(name="players")
 async def list_players(ctx):
