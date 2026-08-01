@@ -49,8 +49,6 @@ DAILY_PACK_ITEMS = [
     {"rcon_id": "DogCoin", "quantity": 250}
 ]
 
-PLAYTIME_REWARD_AMOUNT = 100
-
 SHOP_ITEMS = {
     "pal_sphere": {"name": "Pal Sphere", "id": "PalSphere", "price": 25, "category": "Spheres"},
     "wood": {"name": "Wood", "id": "Wood", "price": 1, "category": "Ores & Materials"},
@@ -123,7 +121,6 @@ known_online_players = set()
 last_known_player_names = {}
 is_players_initialized = False
 
-# FIX: Now accepts account_id (Steam ID) to properly issue RCON 'give' commands
 async def process_login_daily(player_uid: str, player_name: str, account_id: str):
     if not DATABASE_URL or not RCON_HOST:
         return
@@ -151,7 +148,6 @@ async def process_login_daily(player_uid: str, player_name: str, account_id: str
 
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                # FIX: Uses account_id (SteamID) instead of the internal player_uid
                 await rcon.send(f"give {account_id} {item['rcon_id']} {item['quantity']}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
@@ -188,7 +184,6 @@ async def poll_palworld_players_loop():
                         known_online_players = current_ids
                         is_players_initialized = True
                         for pid, pdata in current_players_map.items():
-                            # FIX: Pass the account_id
                             asyncio.create_task(process_login_daily(pid, pdata["name"], pdata["account_id"]))
                     else:
                         joined_ids = current_ids - known_online_players
@@ -200,7 +195,6 @@ async def poll_palworld_players_loop():
                             account_id = pdata["account_id"]
                             
                             logger.info(f"Player join detected: {name} (ID: {account_id})")
-                            # FIX: Pass the account_id
                             asyncio.create_task(process_login_daily(jid, name, account_id))
 
                             if channel:
@@ -228,24 +222,36 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 8. Webhook Handler for Game ➔ Discord Chat
+# 8. Webhook Handler for Game ➔ Discord Chat (Multi-Endpoint)
 # -------------------------------------------------------------
 async def handle_chat_webhook(request):
     try:
         data = await request.json()
+        logger.info(f"📥 Received chat webhook: {data}")
         
-        # Extract the name and message. We deliberately ignore IP and SteamID.
-        name = data.get("name", data.get("username", data.get("player", "Unknown Player")))
-        message = data.get("message", data.get("content", ""))
+        name = (
+            data.get("name") or 
+            data.get("username") or 
+            data.get("player") or 
+            data.get("sender") or 
+            data.get("player_name") or 
+            "Unknown Player"
+        )
+        message = (
+            data.get("message") or 
+            data.get("content") or 
+            data.get("text") or 
+            data.get("msg") or 
+            ""
+        )
         
         channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
         if channel and message:
-            # Clean format: Just the name and the message
             await channel.send(f"💬 **{name}**: {message}")
             
         return web.Response(text="OK")
     except Exception as e:
-        logger.error(f"Error processing incoming game chat webhook: {e}")
+        logger.error(f"❌ Error processing incoming game chat webhook: {e}")
         return web.Response(status=400)
 
 # -------------------------------------------------------------
@@ -279,7 +285,6 @@ async def on_message(message):
                 except Exception as e:
                     logger.error(f"Failed to relay Discord message to game server: {e}")
 
-# Basic Shop Command
 @bot.command(name="shop")
 async def shop(ctx):
     embed = discord.Embed(title="Palworld Shop", color=discord.Color.blue())
@@ -287,7 +292,6 @@ async def shop(ctx):
         embed.add_field(name=item_info['name'], value=f"Cost: {item_info['price']} points\nID: `{item_key}`", inline=False)
     await ctx.send(embed=embed)
 
-# NEW: Manual Daily Reward Command
 @bot.command(name="givedaily")
 @commands.has_permissions(administrator=True)
 async def givedaily(ctx, account_id: str):
@@ -307,7 +311,10 @@ async def givedaily(ctx, account_id: str):
 async def main():
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="OK"))
+    
+    # Listen on BOTH common webhook paths so it catches traffic regardless of mod config
     app.router.add_post("/webhook", handle_chat_webhook)
+    app.router.add_post("/chat", handle_chat_webhook)
     
     runner = web.AppRunner(app)
     await runner.setup()
