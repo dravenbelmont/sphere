@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import json
 from datetime import datetime, timedelta, timezone
 from aiohttp import web
 import discord
@@ -222,37 +223,67 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 8. Webhook Handler for Game ➔ Discord Chat (Multi-Endpoint)
+# 8. Robust Webhook Handler for Pal Defender ➔ Discord Chat
 # -------------------------------------------------------------
 async def handle_chat_webhook(request):
     try:
-        data = await request.json()
-        logger.info(f"📥 Received chat webhook: {data}")
+        content_type = request.headers.get("Content-Type", "")
+        raw_body = await request.text()
+        logger.info(f"📥 Received Webhook Content-Type: {content_type} | Raw Body: {raw_body}")
         
+        data = {}
+        if "application/json" in content_type:
+            try:
+                data = json.loads(raw_body) if raw_body else {}
+            except Exception:
+                data = {"message": raw_body}
+        elif "form" in content_type:
+            post = await request.post()
+            data = dict(post)
+        else:
+            try:
+                data = json.loads(raw_body) if raw_body else {"message": raw_body}
+            except Exception:
+                data = {"message": raw_body}
+
+        if isinstance(data, str):
+            data = {"message": data}
+
         name = (
             data.get("name") or 
             data.get("username") or 
             data.get("player") or 
             data.get("sender") or 
             data.get("player_name") or 
-            "Unknown Player"
+            data.get("author") or
+            "In-Game Player"
         )
         message = (
             data.get("message") or 
             data.get("content") or 
             data.get("text") or 
             data.get("msg") or 
+            raw_body or 
             ""
         )
         
+        # Clean up nested json strings if passed as a string message
+        if isinstance(message, str) and message.startswith("{") and message.endswith("}"):
+            try:
+                parsed_msg = json.loads(message)
+                message = parsed_msg.get("message") or parsed_msg.get("content") or message
+                name = parsed_msg.get("name") or parsed_msg.get("player") or name
+            except Exception:
+                pass
+
         channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
         if channel and message:
             await channel.send(f"💬 **{name}**: {message}")
             
-        return web.Response(text="OK")
+        return web.Response(text="OK", status=200)
     except Exception as e:
-        logger.error(f"❌ Error processing incoming game chat webhook: {e}")
-        return web.Response(status=400)
+        logger.error(f"❌ Error processing incoming game chat webhook: {e}", exc_info=True)
+        return web.Response(text="OK", status=200)
 
 # -------------------------------------------------------------
 # 9. Discord Commands & Event Listeners
@@ -311,8 +342,6 @@ async def givedaily(ctx, account_id: str):
 async def main():
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="OK"))
-    
-    # Listen on BOTH common webhook paths so it catches traffic regardless of mod config
     app.router.add_post("/webhook", handle_chat_webhook)
     app.router.add_post("/chat", handle_chat_webhook)
     
