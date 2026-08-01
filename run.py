@@ -33,6 +33,7 @@ WEB_PORT = int(os.getenv("PORT", "10000"))
 DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_URL") or "").strip().strip("[]()").strip()
 
 SFTP_HOST = (os.getenv("SFTP_HOST") or "").strip().strip("[]()").strip()
+RCON_HOST = (os.getenv("RCON_HOST") or SFTP_HOST).strip().strip("[]()").strip()
 SFTP_PORT = int(os.getenv("SFTP_PORT", "22").strip())
 SFTP_USER = (os.getenv("SFTP_USER") or "").strip().strip("[]()").strip()
 SFTP_PASSWORD = (os.getenv("SFTP_PASSWORD") or "").strip().strip("[]()").strip()
@@ -41,7 +42,7 @@ SFTP_LOG_PATH = (os.getenv("SFTP_LOG_PATH") or "/server-data/Pal/Binaries/Win64/
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
-RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
+RCON_PORT = int(os.getenv("RCON_PORT", "25575").strip())
 
 # -------------------------------------------------------------
 # 2. Shop Catalog Configuration
@@ -367,14 +368,16 @@ async def buy(ctx, item_key: str, quantity: int = 1):
         if not row or row['balance'] < cost:
             return await ctx.send("❌ Not registered or insufficient funds.")
         
-        async with GameRCON(SFTP_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-            await rcon.send(f"give {row['player_uid']} {item['rcon_id']} {quantity}")
+        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            response = await rcon.send(f"give {row['player_uid']} {item['rcon_id']} {quantity}")
+            logger.info(f"RCON Give Response: {response}")
         
         new_bal = row['balance'] - cost
         await conn.execute('UPDATE users SET balance = $1 WHERE discord_id = $2', new_bal, ctx.author.id)
         await ctx.send(f"✅ Purchased {quantity}x **{item['name']}**! New balance: {new_bal}")
     except Exception as e:
-        await ctx.send(f"❌ Delivery failed: {e}")
+        logger.error(f"RCON delivery failed for item {item_key} on host {RCON_HOST}:{RCON_PORT} -> {e}")
+        await ctx.send(f"❌ Delivery failed: Could not connect to game server RCON. Please verify your RCON IP and port.")
     finally:
         await conn.close()
 
