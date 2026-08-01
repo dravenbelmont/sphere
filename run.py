@@ -43,7 +43,7 @@ DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 RCON_PORT = int(os.getenv("RCON_PORT", "25575"))
 
 # -------------------------------------------------------------
-# 2. Economy & Complete Version 1.0 Shop Catalog
+# 2. Fully Cross-Checked Version 1.0 Obtainable Shop Catalog
 # -------------------------------------------------------------
 DAILY_REWARD_AMOUNT = 500
 PLAYTIME_REWARD_AMOUNT = 100  # Coins awarded per hour online
@@ -74,7 +74,7 @@ SHOP_ITEMS = {
     "electricorgan": {"name": "Electric Organ", "rcon_id": "ElectricOrgan", "price": 25, "category": "Basic Materials"},
     "venomgland": {"name": "Venom Gland", "rcon_id": "PoisonGland", "price": 25, "category": "Basic Materials"},
 
-    # === ORES, INGOTS & 1.0 METALS ===
+    # === ORES, INGOTS & METALS ===
     "ore": {"name": "Ore", "rcon_id": "CopperOre", "price": 12, "category": "Ores & Ingots"},
     "ingot": {"name": "Ingot", "rcon_id": "CopperIngot", "price": 25, "category": "Ores & Ingots"},
     "coal": {"name": "Coal", "rcon_id": "Coal", "price": 25, "category": "Ores & Ingots"},
@@ -85,12 +85,14 @@ SHOP_ITEMS = {
     "plasteel": {"name": "Plasteel", "rcon_id": "Plasteel", "price": 250, "category": "Ores & Ingots"},
     "soraliteingot": {"name": "Soralite Ingot", "rcon_id": "SoraliteIngot", "price": 350, "category": "Ores & Ingots"},
 
-    # === ADVANCED MATERIALS ===
+    # === ADVANCED & SPECIAL MATERIALS ===
     "polymer": {"name": "Polymer", "rcon_id": "Polymer", "price": 75, "category": "Advanced Materials"},
     "carbonfiber": {"name": "Carbon Fiber", "rcon_id": "CarbonFiber", "price": 100, "category": "Advanced Materials"},
     "cement": {"name": "Cement", "rcon_id": "Cement", "price": 38, "category": "Advanced Materials"},
     "circuitboard": {"name": "Circuit Board", "rcon_id": "MachinePart", "price": 125, "category": "Advanced Materials"},
     "aicore": {"name": "AI Core", "rcon_id": "AIcore", "price": 500, "category": "Advanced Materials"},
+    "ancienttechpart": {"name": "Ancient Civilization Parts", "rcon_id": "AncientTechnologyPart", "price": 100, "category": "Advanced Materials"},
+    "dogcoin": {"name": "Dog Coin", "rcon_id": "DogCoin", "price": 150, "category": "Advanced Materials"},
 
     # === AMMUNITION ===
     "arrow": {"name": "Arrow", "rcon_id": "Arrow", "price": 2, "category": "Ammunition"},
@@ -105,16 +107,28 @@ SHOP_ITEMS = {
     "energycartridge": {"name": "Energy Cartridge", "rcon_id": "EnergyCartridge", "price": 50, "category": "Ammunition"},
     "plasteelammo": {"name": "Plasteel Ammo", "rcon_id": "PlasteelBullet", "price": 100, "category": "Ammunition"},
 
-    # === WEAPONS ===
+    # === MELEE WEAPONS & SPEARS ===
+    "stonespear": {"name": "Stone Spear", "rcon_id": "StoneSpear", "price": 50, "category": "Melee & Spears"},
+    "metalspear": {"name": "Metal Spear", "rcon_id": "MetalSpear", "price": 150, "category": "Melee & Spears"},
+    "refinedmetalspear": {"name": "Refined Metal Spear", "rcon_id": "RefinedMetalSpear", "price": 400, "category": "Melee & Spears"},
+    "sword": {"name": "Sword", "rcon_id": "Sword", "price": 750, "category": "Melee & Spears"},
+    "electricsword": {"name": "Electric Sword", "rcon_id": "ElectricSword", "price": 2000, "category": "Melee & Spears"},
+    "beamsword": {"name": "Beam Sword", "rcon_id": "BeamSword", "price": 5000, "category": "Melee & Spears"},
+
+    # === RANGED WEAPONS ===
     "oldbow": {"name": "Old Bow", "rcon_id": "OldBow", "price": 125, "category": "Weapons"},
     "mechanicalbow": {"name": "Mechanical Bow", "rcon_id": "MechanicalBow", "price": 750, "category": "Weapons"},
     "crossbow": {"name": "Crossbow", "rcon_id": "Crossbow", "price": 375, "category": "Weapons"},
+    "musket": {"name": "Musket", "rcon_id": "Musket", "price": 500, "category": "Weapons"},
     "handgun": {"name": "Handgun", "rcon_id": "Handgun", "price": 1250, "category": "Weapons"},
     "singleshotrifle": {"name": "Single-shot Rifle", "rcon_id": "Rifle", "price": 2000, "category": "Weapons"},
+    "doublebarrel": {"name": "Double Barrel Shotgun", "rcon_id": "DoubleBarrelShotgun", "price": 3000, "category": "Weapons"},
     "assaultrifle": {"name": "Assault Rifle", "rcon_id": "AssaultRifle", "price": 5000, "category": "Weapons"},
     "combatsmg": {"name": "Combat SMG", "rcon_id": "CombatSMG", "price": 4500, "category": "Weapons"},
     "pumpactionshotgun": {"name": "Pump-action Shotgun", "rcon_id": "PumpActionShotgun", "price": 6250, "category": "Weapons"},
     "laserrifle": {"name": "Laser Rifle", "rcon_id": "LaserRifle", "price": 10000, "category": "Weapons"},
+    "flamethrower": {"name": "Flamethrower", "rcon_id": "FlameThrower", "price": 12000, "category": "Weapons"},
+    "gatlinggun": {"name": "Gatling Gun", "rcon_id": "GatlingGun", "price": 15000, "category": "Weapons"},
     "rocketlauncher": {"name": "Rocket Launcher", "rcon_id": "RocketLauncher", "price": 18750, "category": "Weapons"},
 
     # === ARMOR & SHIELDS ===
@@ -127,6 +141,12 @@ SHOP_ITEMS = {
     "megashield": {"name": "Mega Shield", "rcon_id": "MegaShield", "price": 750, "category": "Armor & Shields"},
     "gigashield": {"name": "Giga Shield", "rcon_id": "GigaShield", "price": 2500, "category": "Armor & Shields"},
     "hypershield": {"name": "Hyper Shield", "rcon_id": "HyperShield", "price": 7500, "category": "Armor & Shields"},
+
+    # === GLIDERS & UTILITIES ===
+    "megaglider": {"name": "Mega Glider", "rcon_id": "Glider_Good", "price": 100, "category": "Gliders & Utilities"},
+    "gigaglider": {"name": "Giga Glider", "rcon_id": "Glider_Super", "price": 300, "category": "Gliders & Utilities"},
+    "hyperglider": {"name": "Hyper Glider", "rcon_id": "Glider_Legend", "price": 800, "category": "Gliders & Utilities"},
+    "lantern": {"name": "Lantern", "rcon_id": "Lantern", "price": 150, "category": "Gliders & Utilities"},
 
     # === MEDICINE & CONSUMABLES ===
     "lowmeds": {"name": "Low Grade Medical Supplies", "rcon_id": "Herb", "price": 50, "category": "Medicine & Consumables"},
