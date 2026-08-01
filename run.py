@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timedelta
 from aiohttp import web
@@ -215,10 +216,29 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 5. Background Loops (SFTP Chat & Playtime Rewards)
+# 5. Background Loops (Sanitized SFTP Chat & Playtime Rewards)
 # -------------------------------------------------------------
 last_position = 0 
 last_file_name = None
+
+def parse_clean_chat(line: str):
+    """Safely extracts only the player name and message, filtering out IPs and IDs."""
+    if "Chat:" not in line:
+        return None
+    
+    # Isolate everything after 'Chat:'
+    parts = line.split("Chat:", 1)
+    if len(parts) < 2:
+        return None
+    raw_content = parts[1].strip()
+    
+    # Remove IP addresses/ports (e.g., [192.168.1.1:8211])
+    raw_content = re.sub(r'\[\d{1,3}(?:\.\d{1,3}){3}:\d+\]', '', raw_content)
+    # Remove SteamIDs or PlayerUIDs wrapped in brackets (e.g., [76561198...])
+    raw_content = re.sub(r'\[[0-9a-zA-Z_-]{10,}\]', '', raw_content)
+    
+    cleaned = raw_content.strip()
+    return cleaned if cleaned else None
 
 async def sftp_chat_listener_loop():
     global last_position, last_file_name
@@ -261,8 +281,9 @@ async def sftp_chat_listener_loop():
 
             new_lines = await asyncio.to_thread(scan_logs)
             for line in new_lines:
-                if "Chat:" in line:
-                    await channel.send(f"💬 `{line}`")
+                chat_msg = parse_clean_chat(line)
+                if chat_msg:
+                    await channel.send(f"💬 **{chat_msg}**")
         except Exception as e:
             logger.error(f"SFTP Error: {e}")
             
