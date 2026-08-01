@@ -123,14 +123,21 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 4. Palworld REST API Helpers
+# 4. Palworld REST API Helpers (Auto-fixes base path with /v1/api)
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     """Communicates with Palworld's native REST API via HTTP Basic Auth."""
     if not REST_API_URL or not ADMIN_PASSWORD:
         return None, "REST_API_URL or ADMIN_PASSWORD missing."
     
-    url = f"{REST_API_URL.rstrip('/')}{endpoint}"
+    base_url = REST_API_URL.rstrip('/')
+    if not base_url.endswith('/v1/api'):
+        if base_url.endswith('/v1'):
+            base_url += '/api'
+        else:
+            base_url += '/v1/api'
+            
+    url = f"{base_url}{endpoint}"
     auth = aiohttp.BasicAuth("admin", ADMIN_PASSWORD)
     
     try:
