@@ -487,7 +487,7 @@ async def givedaily(ctx, account_id: str):
 # -------------------------------------------------------------
 # 10. Web Server & Main Execution
 # -------------------------------------------------------------
-main = async def main():
+async def main():
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="OK"))
     
