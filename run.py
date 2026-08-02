@@ -227,53 +227,16 @@ async def poll_palworld_players_loop():
 # -------------------------------------------------------------
 async def handle_chat_webhook(request):
     try:
-        content_type = request.headers.get("Content-Type", "")
         raw_body = await request.text()
-        logger.info(f"📥 Received Webhook Content-Type: {content_type} | Raw Body: {raw_body}")
-        
-        data = {}
-        if "application/json" in content_type:
-            try:
-                data = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                data = {"message": raw_body}
-        elif "form" in content_type:
-            post = await request.post()
-            data = dict(post)
-        else:
-            try:
-                data = json.loads(raw_body) if raw_body else {"message": raw_body}
-            except Exception:
-                data = {"message": raw_body}
-
-        if isinstance(data, str):
-            data = {"message": data}
-
-        name = (
-            data.get("name") or 
-            data.get("username") or 
-            data.get("player") or 
-            data.get("sender") or 
-            data.get("player_name") or 
-            data.get("author") or
-            "In-Game Player"
-        )
-        message = (
-            data.get("message") or 
-            data.get("content") or 
-            data.get("text") or 
-            data.get("msg") or 
-            raw_body or 
-            ""
-        )
+        logger.info(f"📥 Incoming Webhook Payload: {raw_body}")
         
         channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
-        if channel and message:
-            await channel.send(f"💬 **{name}**: {message}")
+        if channel and raw_body:
+            await channel.send(f"💬 {raw_body}")
             
         return web.Response(text="OK", status=200)
     except Exception as e:
-        logger.error(f"❌ Error processing incoming game chat webhook: {e}", exc_info=True)
+        logger.error(f"Webhook error: {e}")
         return web.Response(text="OK", status=200)
 
 # -------------------------------------------------------------
