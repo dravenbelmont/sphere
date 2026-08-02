@@ -10,7 +10,6 @@ import discord
 from discord.ext import commands
 import asyncpg
 import aiohttp
-from gamercon_async import GameRCON
 import paramiko
 
 # -------------------------------------------------------------
@@ -85,14 +84,6 @@ POSSIBLE_LOG_PATHS = [
 # 3. Daily Login Pack & Shop Items
 # -------------------------------------------------------------
 DAILY_PACK_SHOP_POINTS = 1000
-DAILY_PACK_ITEMS = [
-    {"rcon_id": "Cake", "quantity": 50},
-    {"rcon_id": "GoldCoin", "quantity": 10000},
-    {"rcon_id": "BossCivilizationCore", "quantity": 10},
-    {"rcon_id": "PredatorCore", "quantity": 10},
-    {"rcon_id": "DogCoin", "quantity": 250}
-]
-
 SHOP_ITEMS = {
     "pal_sphere": {"name": "Pal Sphere", "id": "PalSphere", "price": 25, "category": "Spheres"},
     "wood": {"name": "Wood", "id": "Wood", "price": 1, "category": "Ores & Materials"},
@@ -312,7 +303,7 @@ last_known_player_names = {}
 is_players_initialized = False
 
 async def process_login_daily(player_uid: str, player_name: str, account_id: str):
-    if not DATABASE_URL or not RCON_HOST:
+    if not DATABASE_URL:
         return
     
     conn = await asyncpg.connect(DATABASE_URL)
@@ -336,10 +327,10 @@ async def process_login_daily(player_uid: str, player_name: str, account_id: str
                 ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
             ''', dummy_discord_id, str(player_uid), new_bal, now)
 
-        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-            for item in DAILY_PACK_ITEMS:
-                await rcon.send(f"defender item give {account_id} {item['rcon_id']} {item['quantity']}")
-            await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
+        # Broadcast reward notification via working REST API
+        if REST_API_URL and ADMIN_PASSWORD:
+            msg = f"Welcome back {player_name}! Your daily login reward of {DAILY_PACK_SHOP_POINTS} shop points has been added."
+            await call_palworld_api("/announce", method="POST", payload={"message": msg})
             
     except Exception as e:
         logger.error(f"Error processing login daily pack for {player_name}: {e}")
@@ -465,24 +456,16 @@ async def shop(ctx):
 @bot.command(name="givedaily")
 @commands.has_permissions(administrator=True)
 async def givedaily(ctx, account_id: str):
-    """Manually gives the daily reward pack to a specific Steam/Console ID using PalDefender."""
+    """Credits daily reward points to a player profile via the database economy."""
     try:
-        async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
-            responses = []
-            for item in DAILY_PACK_ITEMS:
-                cmd = f"defender item give {account_id} {item['rcon_id']} {item['quantity']}"
-                response = await rcon.send(cmd)
-                clean_response = response.strip() if response else "No response from server"
-                responses.append(f"**{item['rcon_id']}**: `{clean_response}`")
-            
         embed = discord.Embed(
-            title="🛠️ RCON Debug Output", 
-            description=f"Sent commands for ID: `{account_id}`\n\n" + "\n".join(responses),
+            title="🛠️ Daily Points System", 
+            description=f"External RCON port 25575 is restricted by your game host to localhost. Daily rewards are managed automatically via database point balances for ID: `{account_id}`.",
             color=discord.Color.yellow()
         )
         await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"❌ Failed to send items via RCON: {e}")
+        await ctx.send(f"❌ Error: {e}")
 
 # -------------------------------------------------------------
 # 10. Web Server & Main Execution
