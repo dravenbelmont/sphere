@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 2. Environment & Configuration
+# 2. Environment & Configuration (Self-Healing Variable Fallbacks)
 # -------------------------------------------------------------
 DISCORD_TOKEN = (os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN") or "").strip().strip("[]()").strip()
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
@@ -42,13 +42,22 @@ DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
 # SFTP Credentials
 SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip().strip("[]()").strip()
-_sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
+_sftp_port_val = (os.getenv("SFTP_PORT") or os.getenv("SFTP_PORT_VAL") or "22").strip().strip("[]()").strip()
 SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
-SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
-SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
+SFTP_USER = (os.getenv("SFTP_USER") or os.getenv("SFTP_USERNAME") or "").strip().strip("[]()").strip()
+SFTP_PASSWORD = (os.getenv("SFTP_PASSWORD") or os.getenv("SFTP_PASS") or ADMIN_PASSWORD).strip().strip("[]()").strip()
 
-# PalDefender root path
-PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
+# Self-healing path fallbacks for different hosting panels (Pterodactyl, Docker, Custom Linux)
+POSSIBLE_LOG_PATHS = [
+    os.getenv("PALDEFENDER_LOG_PATH"),
+    os.getenv("LOG_PATH"),
+    os.getenv("SERVER_LOG_PATH"),
+    "/server-data/Pal/Binaries/Win64/PalDefender",
+    "/home/container/Pal/Binaries/Win64/PalDefender",
+    "/app/Pal/Binaries/Win64/PalDefender",
+    "./Pal/Binaries/Win64/PalDefender",
+    "/Pal/Binaries/Win64/PalDefender"
+]
 
 # -------------------------------------------------------------
 # 3. Daily Login Pack & Shop Items
@@ -98,7 +107,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 6. Palworld REST API Helpers (Port 27014 Support)
+# 6. Palworld REST API Helpers
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -130,7 +139,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Clean Chat Parser (Name & Message Only)
+# 7. Self-Healing SFTP Chat Poller & Parser
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -138,19 +147,53 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP clean chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting Self-Healing SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
     last_file_path_seen = None
     last_file_size = 0
+    resolved_log_path = None
 
     while not bot.is_closed():
         try:
             def check_logs():
-                nonlocal last_file_path_seen, last_file_size
+                nonlocal last_file_path_seen, last_file_size, resolved_log_path
                 transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
                 transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
                 sftp = paramiko.SFTPClient.from_transport(transport)
                 
                 try:
+                    # Self-heal path discovery if not resolved yet
+                    if not resolved_log_path:
+                        paths_to_test = [p for p in POSSIBLE_LOG_PATHS if p]
+                        for test_path in paths_to_test:
+                            try:
+                                sftp.stat(test_path)
+                                resolved_log_path = test_path
+                                logger.info(f"✅ Successfully auto-discovered log path: {resolved_log_path}")
+                                break
+                            except Exception:
+                                continue
+                        
+                        if not resolved_log_path:
+                            # Fallback search from root / or home directory
+                            try:
+                                root_dirs = ['', '/home/container', '/server-data', '/app']
+                                for r in root_dirs:
+                                    try:
+                                        for entry in sftp.listdir(r or '.'):
+                                            if 'pal' in entry.lower() or 'binaries' in entry.lower():
+                                                potential = f"{r}/{entry}/Binaries/Win64/PalDefender" if r else f"{entry}/Binaries/Win64/PalDefender"
+                                                sftp.stat(potential)
+                                                resolved_log_path = potential
+                                                logger.info(f"✅ Self-healed path via recursive scan: {resolved_log_path}")
+                                                break
+                                    except Exception:
+                                        continue
+                            except Exception:
+                                pass
+
+                    if not resolved_log_path:
+                        resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender" # Ultimate default fallback
+
                     def find_chat_file(current_dir):
                         chat_candidates = []
                         all_candidates = []
@@ -172,7 +215,7 @@ async def poll_paldefender_logs_loop():
                                 elif stat.S_ISREG(mode):
                                     file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
                                     all_candidates.append(file_info)
-                                    if 'chat' in entry.filename.lower():
+                                    if 'chat' in entry.filename.lower() or 'log' in entry.filename.lower():
                                         chat_candidates.append(file_info)
                             except Exception:
                                 continue
@@ -185,7 +228,7 @@ async def poll_paldefender_logs_loop():
                             return all_candidates[0]
                         return None
 
-                    latest = find_chat_file(PALDEFENDER_LOG_PATH)
+                    latest = find_chat_file(resolved_log_path)
                     if not latest:
                         sftp.close()
                         transport.close()
@@ -226,14 +269,33 @@ async def poll_paldefender_logs_loop():
                     
                     line_lower = line_str.lower()
                     
-                    if "chat::" not in line_lower:
+                    # Target chat lines (flexible match for any chat log variant)
+                    if "chat" not in line_lower and "global" not in line_lower:
                         continue
 
-                    # Regex to precisely match the player name and message, ignoring timestamps, UIDs, IPs, and admin tags
-                    chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'[^\]]*\](?:\[[^\]]+\])?:\s*(.*)", line_str, re.IGNORECASE)
+                    player_name = None
+                    message_text = None
+
+                    # Tier 1: Precise regex for standard PalDefender log line
+                    chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'", line_str, re.IGNORECASE)
                     if chat_match:
                         player_name = chat_match.group(1).strip()
-                        message_text = chat_match.group(2).strip()
+                        # Extract everything after the last colon and bracket combination
+                        msg_match = re.search(r"\]:\s*(.*)$", line_str)
+                        if msg_match:
+                            message_text = msg_match.group(1).strip()
+
+                    # Tier 2: Fallback lenient parser if Tier 1 misses
+                    if not player_name or not message_text:
+                        parts = line_str.split(':')
+                        if len(parts) >= 3:
+                            # Look for quotes holding the name
+                            quote_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
+                            if quote_match:
+                                player_name = quote_match.group(1).strip()
+                                message_text = parts[-1].strip()
+
+                    if player_name and message_text:
                         await channel.send(f"💬 **{player_name}**: {message_text}")
 
         except Exception as e:
