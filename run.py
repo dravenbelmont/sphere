@@ -129,7 +129,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Dedicated SFTP Chat Poller (Prioritizes Chat Logs)
+# 7. Strict Player Chat-Only SFTP Poller
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -137,7 +137,7 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP dedicated chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP strict chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_path_seen = None
     last_file_size = 0
 
@@ -194,7 +194,7 @@ async def poll_paldefender_logs_loop():
                     new_lines = []
 
                     if last_file_path_seen != full_path:
-                        logger.info(f"🔄 Locked onto chat log file: {filename} ({full_path})")
+                        logger.info(f"🔄 Monitoring log file for player chat: {filename} ({full_path})")
                         last_file_path_seen = full_path
                         last_file_size = 0
                     
@@ -220,7 +220,33 @@ async def poll_paldefender_logs_loop():
             if channel and raw_lines:
                 for line in raw_lines:
                     line_str = line.strip()
-                    if line_str:
+                    if not line_str:
+                        continue
+                    
+                    line_lower = line_str.lower()
+                    
+                    # Strict validation: Only allow actual player chat messages.
+                    # Block all world readouts, network telemetry, API logs, and system/engine events.
+                    system_noise = [
+                        "log", "net", "world", "blueprint", "packet", "tick", "spawn", 
+                        "save", "http", "api", "get", "post", "json", "sftp", "auth", 
+                        "connect", "disconnect", "exception", "stack", "plugin", 
+                        "paldefender", "unreal", "engine", "driver", "pawn", "actor",
+                        "bsp", "init", "loading", "success", "error", "warning"
+                    ]
+                    
+                    if any(word in line_lower for word in system_noise):
+                        continue
+                    
+                    # Must contain explicit chat formatting or a clean speaker structure
+                    is_valid_chat = False
+                    if any(tag in line_lower for tag in ["[chat]", "[global]", "[guild]", "[say]", "[whisper]"]):
+                        is_valid_chat = True
+                    elif ":" in line_str and len(line_str.split(":")[0]) < 30:
+                        # Clean player message format like "PlayerName: hello"
+                        is_valid_chat = True
+
+                    if is_valid_chat:
                         await channel.send(f"💬 {line_str}")
 
         except Exception as e:
