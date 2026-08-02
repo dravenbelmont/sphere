@@ -130,7 +130,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Strict SFTP Poller with IP Sanitization
+# 7. Clean Chat Parser (Name & Message Only, No IPs/Identifiers)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -138,7 +138,7 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP secure chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP clean chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_path_seen = None
     last_file_size = 0
 
@@ -226,16 +226,27 @@ async def poll_paldefender_logs_loop():
                     
                     line_lower = line_str.lower()
                     
-                    # STRICT WHITELIST: Only allow actual in-game chat events containing '[chat::'
-                    if "[chat::" not in line_lower:
+                    # Target chat lines
+                    if "chat::" not in line_lower:
                         continue
 
-                    # Sanitize line to completely remove IP addresses and clean up extra spacing/commas
-                    sanitized_line = re.sub(r'IP=[0-9.]+\s*,?', '', line_str)
-                    sanitized_line = re.sub(r',\s*,', ',', sanitized_line)
-                    sanitized_line = re.sub(r'\(\s*,', '(', sanitized_line)
+                    # Strip out the entire telemetry block (UserId, IP, UIDs, etc.)
+                    clean_line = re.sub(r'\(.*?\)', '', line_str)
+                    
+                    # Extract chat sender and message text
+                    chat_match = re.search(r'\[Chat::\w+\]\s*(.+?):\s*(.*)', clean_line, re.IGNORECASE)
+                    if chat_match:
+                        sender_part = chat_match.group(1).strip()
+                        message_text = chat_match.group(2).strip()
+                        
+                        # Isolate the player's name from quotes
+                        name_match = re.search(r'[\'\"]([^\'\"]+)[\'\"]', sender_part)
+                        if name_match:
+                            player_name = name_match.group(1)
+                        else:
+                            player_name = re.sub(r'[\[\]\']', '', sender_part).split()[0]
 
-                    await channel.send(f"💬 {sanitized_line}")
+                        await channel.send(f"**{player_name}**: {message_text}")
 
         except Exception as e:
             logger.error(f"❌ SFTP Chat Polling Error: {e}")
