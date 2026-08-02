@@ -44,7 +44,6 @@ _sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
 SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
-# Corrected path based on your server container logs
 PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/palworld/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
@@ -95,7 +94,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 6. Palworld REST API Helpers
+# 6. Palworld REST API Helpers (Supports Port 27014)
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -121,11 +120,13 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
                         return {"text": text}, None
                 else:
                     return None, f"HTTP {response.status}"
+    except aiohttp.ClientConnectorError:
+        return None, "Server offline / starting up (Connection Refused)"
     except Exception as e:
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Pal Defender SFTP Log Poller (Fixed File Rotation)
+# 7. Pal Defender SFTP Log Poller
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -152,7 +153,6 @@ async def poll_paldefender_logs_loop():
                         transport.close()
                         return []
 
-                    # Sort by modification time to get the newest log file
                     files.sort(key=lambda x: x.st_mtime, reverse=True)
                     latest_file = files[0]
                     current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
@@ -161,7 +161,7 @@ async def poll_paldefender_logs_loop():
                     if last_file_name != latest_file.filename:
                         logger.info(f"🔄 New Pal Defender log file detected: {latest_file.filename}")
                         last_file_name = latest_file.filename
-                        last_file_size = 0  # Reset size to 0 so we read the new log file from the beginning!
+                        last_file_size = 0  # Reset size to 0 for new file rotation
                     
                     if latest_file.st_size > last_file_size:
                         with sftp.open(current_file_path, 'r') as f:
@@ -327,7 +327,7 @@ async def on_message(message):
                     chat_text = f"[{message.author.display_name}] {clean_msg}"
                     
                     _, error = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
-                    if error:
+                    if error and "Server offline" not in error:
                         logger.error(f"Failed to relay message via REST API: {error}")
                 except Exception as e:
                     logger.error(f"Failed to relay Discord message to game server: {e}")
@@ -368,3 +368,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
