@@ -66,9 +66,8 @@ SFTP_PORT = int(_sftp_port_val) if str(_sftp_port_val).isdigit() else 22
 SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
 SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
-# Set ENABLE_SFTP_POLLING="true" in environment variables ONLY if you wish to enable SFTP log reading.
-# Disabled by default to prevent Windows file locking crashes on PalServer.exe
-ENABLE_SFTP_POLLING = os.getenv("ENABLE_SFTP_POLLING", "false").lower() in ("true", "1", "yes")
+# Enabled by default so in-game chat reaches Discord properly
+ENABLE_SFTP_POLLING = os.getenv("ENABLE_SFTP_POLLING", "true").lower() in ("true", "1", "yes")
 
 POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
@@ -307,22 +306,50 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
     finally:
         await conn.close()
 
+# -------------------------------------------------------------
+# 8. IP-Stripping Chat Sanitizer
+# -------------------------------------------------------------
 def parse_and_clean_chat(line_str: str):
     try:
+        # Extract quoted player name if present
         name_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
-        player_name = name_match.group(1) if name_match else "Player"
-        message = line_str.split("]: ")[-1].strip() if "]: " in line_str else line_str
+        if name_match:
+            player_name = name_match.group(1)
+        else:
+            if "]: " in line_str:
+                player_name = line_str.split("]: ")[0].split()[-1]
+            else:
+                player_name = "Player"
+
+        # Completely strip IPv4 addresses (e.g. 192.168.1.1 or 127.0.0.1:25575)
+        player_name = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b', '', player_name)
+        
+        # Strip leftover brackets/parentheses and redundant spaces
+        player_name = re.sub(r'[\(\)\[\]<>]', '', player_name)
+        player_name = re.sub(r'\s+', ' ', player_name).strip()
+        
+        if not player_name or player_name.lower() in ("chat", "global", "info"):
+            player_name = "Player"
+
+        # Extract message text
+        if "]: " in line_str:
+            message = line_str.split("]: ")[-1].strip()
+        elif ": " in line_str:
+            message = line_str.split(": ", 1)[-1].strip()
+        else:
+            message = line_str.strip()
+
         return player_name, message
     except Exception:
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 8. SFTP Chat Poller (Safe Toggle)
+# 9. SFTP Chat Poller Loop
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not ENABLE_SFTP_POLLING:
-        logger.info("🛡️ SFTP log polling is DISABLED to prevent server file-lock crashes.")
+        logger.info("🛡️ SFTP log polling is DISABLED.")
         return
 
     if not SFTP_HOST or not SFTP_USER:
@@ -415,14 +442,14 @@ async def poll_paldefender_logs_loop():
                                 asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
 
         except Exception as e:
-            logger.error(f"❌ SFTP Error: {e}")
+            logger.error(f"❌ SFTP Polling Exception: {e}")
             sftp = None
             transport = None
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(10)
 
 # -------------------------------------------------------------
-# 9. Player Tracker Loop
+# 10. Player Tracker Loop
 # -------------------------------------------------------------
 async def poll_palworld_players_loop():
     global last_known_player_names
@@ -444,7 +471,7 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(30)
 
 # -------------------------------------------------------------
-# 10. Discord Commands
+# 11. Discord Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -591,7 +618,7 @@ async def resetdaily(ctx):
         await conn.close()
 
 # -------------------------------------------------------------
-# 11. Web Server & Execution
+# 12. Web Server & Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
