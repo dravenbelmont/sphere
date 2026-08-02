@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 2. Dynamic Environment Variable Scanner (Agnostic to Specific Names)
+# 2. Dynamic Environment Variable Scanner (Strict Port Prioritization)
 # -------------------------------------------------------------
 def find_env_val(*patterns, default=""):
     """Scans all os.environ keys dynamically for any matching keyword patterns."""
@@ -44,25 +44,28 @@ def find_env_val_multi(*pattern_sets, default=""):
             return val
     return default
 
-# Automatically discover all configuration keys from any environment variable
+# Explicitly prioritize Render's standard PORT variable to fix port-binding errors
+_port_val = os.getenv("PORT") or find_env_val("web_port") or "10000"
+WEB_PORT = int(_port_val) if str(_port_val).isdigit() else 10000
+
+# Automatically discover all other configuration keys dynamically
 DISCORD_TOKEN = find_env_val_multi(("discord_token",), ("bot_token",), ("token",))
 BOT_PREFIX = find_env_val("prefix") or "!"
 REST_API_URL = find_env_val_multi(("rest_api",), ("palworld_api",), ("api_url",), ("api",))
 ADMIN_PASSWORD = find_env_val_multi(("admin_pass",), ("rcon_pass",), ("admin",), ("password",), ("pass",))
-WEB_PORT = int(find_env_val("port", "web_port") or "10000")
 DATABASE_URL = find_env_val_multi(("database",), ("supabase",), ("db_url",), ("db",))
 
 RCON_HOST = find_env_val_multi(("rcon_host",), ("server_ip",), ("host",), ("ip",)) or "127.0.0.1"
-_rcon_port_val = find_env_val_multi(("rcon_port",), ("server_port",), ("rcon", "port"), ("port",)) or "25575"
-RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
+_rcon_port_val = find_env_val("rcon_port") or "25575"
+RCON_PORT = int(_rcon_port_val) if str(_rcon_port_val).isdigit() else 25575
 
 _channel_val = find_env_val_multi(("chat_channel",), ("channel_id",), ("channel",)) or "0"
-DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
+DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if str(_channel_val).isdigit() else 0
 
 # SFTP Credentials (Dynamic Fallbacks)
 SFTP_HOST = find_env_val_multi(("sftp_host",), ("ftp_host",)) or RCON_HOST
-_sftp_port_val = find_env_val_multi(("sftp_port",), ("ftp_port",)) or "22"
-SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
+_sftp_port_val = find_env_val("sftp_port") or "22"
+SFTP_PORT = int(_sftp_port_val) if str(_sftp_port_val).isdigit() else 22
 SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
 SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
@@ -484,7 +487,7 @@ async def givedaily(ctx, account_id: str):
 # -------------------------------------------------------------
 # 10. Web Server & Main Execution
 # -------------------------------------------------------------
-async def main():
+main = async def main():
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="OK"))
     
