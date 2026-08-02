@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import stat
+import re
 from datetime import datetime, timedelta, timezone
 from aiohttp import web
 import discord
@@ -129,7 +130,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Strict Whitelist Chat-Only SFTP Poller
+# 7. Strict SFTP Poller with IP Sanitization
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -137,7 +138,7 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP chat-only poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP secure chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_path_seen = None
     last_file_size = 0
 
@@ -229,7 +230,12 @@ async def poll_paldefender_logs_loop():
                     if "[chat::" not in line_lower:
                         continue
 
-                    await channel.send(f"💬 {line_str}")
+                    # Sanitize line to completely remove IP addresses and clean up extra spacing/commas
+                    sanitized_line = re.sub(r'IP=[0-9.]+\s*,?', '', line_str)
+                    sanitized_line = re.sub(r',\s*,', ',', sanitized_line)
+                    sanitized_line = re.sub(r'\(\s*,', '(', sanitized_line)
+
+                    await channel.send(f"💬 {sanitized_line}")
 
         except Exception as e:
             logger.error(f"❌ SFTP Chat Polling Error: {e}")
