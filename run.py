@@ -24,28 +24,47 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 2. Environment & Configuration (Self-Healing Variable Fallbacks)
+# 2. Dynamic Environment Variable Scanner (Agnostic to Specific Names)
 # -------------------------------------------------------------
-DISCORD_TOKEN = (os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN") or "").strip().strip("[]()").strip()
-BOT_PREFIX = os.getenv("BOT_PREFIX", "!").strip()
-REST_API_URL = (os.getenv("REST_API_URL") or os.getenv("PALWORLD_API_URL") or "").strip().strip("[]()").strip()
-ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or os.getenv("RCON_PASSWORD") or "").strip().strip("[]()").strip()
-WEB_PORT = int(os.getenv("PORT", "10000"))
-DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_URL") or "").strip().strip("[]()").strip()
+def find_env_val(*patterns, default=""):
+    """Scans all os.environ keys dynamically for any matching keyword patterns."""
+    for k, v in os.environ.items():
+        k_low = k.lower()
+        if any(p in k_low for p in patterns):
+            val = v.strip().strip("[]()").strip()
+            if val:
+                return val
+    return default
 
-RCON_HOST = (os.getenv("RCON_HOST") or "127.0.0.1").strip().strip("[]()").strip()
-_rcon_port_val = (os.getenv("RCON_PORT") or os.getenv("PALWORLD_RCON_PORT") or os.getenv("SERVER_RCON_PORT") or "25575").strip().strip("[]()").strip()
+def find_env_val_multi(*pattern_sets, default=""):
+    """Scans os.environ using multiple fallback pattern sets."""
+    for patterns in pattern_sets:
+        val = find_env_val(*patterns)
+        if val:
+            return val
+    return default
+
+# Automatically discover all configuration keys from any environment variable
+DISCORD_TOKEN = find_env_val_multi(("discord_token",), ("bot_token",), ("token",))
+BOT_PREFIX = find_env_val("prefix") or "!"
+REST_API_URL = find_env_val_multi(("rest_api",), ("palworld_api",), ("api_url",), ("api",))
+ADMIN_PASSWORD = find_env_val_multi(("admin_pass",), ("rcon_pass",), ("admin",), ("password",), ("pass",))
+WEB_PORT = int(find_env_val("port", "web_port") or "10000")
+DATABASE_URL = find_env_val_multi(("database",), ("supabase",), ("db_url",), ("db",))
+
+RCON_HOST = find_env_val_multi(("rcon_host",), ("server_ip",), ("host",), ("ip",)) or "127.0.0.1"
+_rcon_port_val = find_env_val_multi(("rcon_port",), ("server_port",), ("rcon", "port"), ("port",)) or "25575"
 RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
 
-_channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
+_channel_val = find_env_val_multi(("chat_channel",), ("channel_id",), ("channel",)) or "0"
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
-# SFTP Credentials
-SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip().strip("[]()").strip()
-_sftp_port_val = (os.getenv("SFTP_PORT") or os.getenv("SFTP_PORT_VAL") or "22").strip().strip("[]()").strip()
+# SFTP Credentials (Dynamic Fallbacks)
+SFTP_HOST = find_env_val_multi(("sftp_host",), ("ftp_host",)) or RCON_HOST
+_sftp_port_val = find_env_val_multi(("sftp_port",), ("ftp_port",)) or "22"
 SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
-SFTP_USER = (os.getenv("SFTP_USER") or os.getenv("SFTP_USERNAME") or "").strip().strip("[]()").strip()
-SFTP_PASSWORD = (os.getenv("SFTP_PASSWORD") or os.getenv("SFTP_PASS") or ADMIN_PASSWORD).strip().strip("[]()").strip()
+SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
+SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
 # Self-healing path fallbacks for different hosting panels
 POSSIBLE_LOG_PATHS = [
@@ -152,7 +171,6 @@ async def poll_paldefender_logs_loop():
     last_file_size = 0
     resolved_log_path = None
 
-    # Keep transport and SFTP connection open persistently
     transport = None
     sftp = None
 
@@ -176,7 +194,6 @@ async def poll_paldefender_logs_loop():
             def check_logs():
                 nonlocal last_file_path_seen, last_file_size, resolved_log_path
                 
-                # Self-heal path discovery if not resolved yet
                 if not resolved_log_path:
                     paths_to_test = [p for p in POSSIBLE_LOG_PATHS if p]
                     for test_path in paths_to_test:
@@ -189,7 +206,7 @@ async def poll_paldefender_logs_loop():
                             continue
                     
                     if not resolved_log_path:
-                        resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender" # Ultimate default fallback
+                        resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender"
 
                 def find_chat_file(current_dir):
                     chat_candidates = []
@@ -260,7 +277,6 @@ async def poll_paldefender_logs_loop():
 
                     player_name, message_text = None, None
 
-                    # Tier 1
                     chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'", line_str, re.IGNORECASE)
                     if chat_match:
                         player_name = chat_match.group(1).strip()
@@ -268,7 +284,6 @@ async def poll_paldefender_logs_loop():
                         if msg_match:
                             message_text = msg_match.group(1).strip()
 
-                    # Tier 2
                     if not player_name or not message_text:
                         parts = line_str.split(':')
                         if len(parts) >= 3:
@@ -282,9 +297,8 @@ async def poll_paldefender_logs_loop():
 
         except Exception as e:
             logger.error(f"❌ SFTP Chat Polling Error (Reconnecting...): {e}")
-            sftp = None # Force a reconnect on the next loop iteration
+            sftp = None
 
-        # Rate-limiting backoff
         await asyncio.sleep(10)
 
 # -------------------------------------------------------------
@@ -321,7 +335,6 @@ async def process_login_daily(player_uid: str, player_name: str, account_id: str
 
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                # Removed the slash for PalDefender RCON command
                 await rcon.send(f"defender item give {account_id} {item['rcon_id']} {item['quantity']}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
@@ -393,7 +406,6 @@ async def poll_palworld_players_loop():
             except Exception as e:
                 logger.error(f"Player polling loop error: {e}")
                 
-        # Rate-limiting backoff
         await asyncio.sleep(25)
 
 # -------------------------------------------------------------
@@ -410,9 +422,8 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    """Global error handler to prevent silent failures in Discord."""
     if isinstance(error, commands.CommandNotFound):
-        pass # Ignore typos
+        pass 
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"❌ **Missing argument!** You need to provide the player ID.\nExample: `{ctx.prefix}{ctx.command.name} 1234567890`")
     elif isinstance(error, commands.MissingPermissions):
@@ -456,11 +467,8 @@ async def givedaily(ctx, account_id: str):
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             responses = []
             for item in DAILY_PACK_ITEMS:
-                # Removed the '/' because RCON usually doesn't accept chat prefixes
                 cmd = f"defender item give {account_id} {item['rcon_id']} {item['quantity']}"
                 response = await rcon.send(cmd)
-                
-                # Clean up the response for Discord
                 clean_response = response.strip() if response else "No response from server"
                 responses.append(f"**{item['rcon_id']}**: `{clean_response}`")
             
