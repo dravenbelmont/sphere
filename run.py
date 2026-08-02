@@ -321,7 +321,8 @@ async def process_login_daily(player_uid: str, player_name: str, account_id: str
 
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                await rcon.send(f"give {account_id} {item['rcon_id']} {item['quantity']}")
+                # Updated to use PalDefender give command
+                await rcon.send(f"/defender item give {account_id} {item['rcon_id']} {item['quantity']}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
     except Exception as e:
@@ -437,11 +438,12 @@ async def shop(ctx):
 @bot.command(name="givedaily")
 @commands.has_permissions(administrator=True)
 async def givedaily(ctx, account_id: str):
-    """Manually gives the daily reward pack to a specific Steam/Console ID."""
+    """Manually gives the daily reward pack to a specific Steam/Console ID using PalDefender."""
     try:
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                await rcon.send(f"give {account_id} {item['rcon_id']} {item['quantity']}")
+                # Updated to use PalDefender give command
+                await rcon.send(f"/defender item give {account_id} {item['rcon_id']} {item['quantity']}")
             
         await ctx.send(f"✅ Successfully sent the daily pack to Steam/Console ID: `{account_id}`")
     except Exception as e:
