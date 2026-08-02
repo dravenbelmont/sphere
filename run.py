@@ -233,11 +233,9 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
 def parse_and_clean_chat(line_str: str):
     """Strips all server metadata, timestamps, UserIDs, and IP addresses, returning only name and message."""
     try:
-        # Extract player name from single quotes (e.g., ['Draven'])
         name_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
         player_name = name_match.group(1) if name_match else "Player"
         
-        # Extract the message content after the last ']: ' delimiter
         if "]: " in line_str:
             message = line_str.split("]: ")[-1].strip()
         else:
@@ -248,14 +246,14 @@ def parse_and_clean_chat(line_str: str):
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 9. SFTP Chat Poller & In-Game Command Listener (!daily)
+# 9. Hardened SFTP Poller & In-Game Command Listener (!daily)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not SFTP_HOST or not SFTP_USER:
         return
 
-    logger.info(f"📂 Starting SFTP chat poller & listener for !daily on {SFTP_HOST}:{SFTP_PORT}")
+    logger.info(f"📂 Starting hardened SFTP chat poller & listener on {SFTP_HOST}:{SFTP_PORT}")
     last_file_path_seen = None
     last_file_size = 0
     resolved_log_path = None
@@ -268,9 +266,15 @@ async def poll_paldefender_logs_loop():
         if sftp is not None:
             try:
                 sftp.close()
+            except: pass
+        if transport is not None:
+            try:
                 transport.close()
             except: pass
+        
         t = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        # Enable TCP keepalives to prevent 1-hour session drop timeouts
+        t.set_keepalive(30)
         t.connect(username=SFTP_USER, password=SFTP_PASSWORD)
         return t, paramiko.SFTPClient.from_transport(t)
 
@@ -278,6 +282,7 @@ async def poll_paldefender_logs_loop():
         try:
             if sftp is None or transport is None or not transport.is_active():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
+                logger.info("🔗 SFTP connection established / refreshed successfully.")
 
             def check_logs():
                 nonlocal last_file_path_seen, last_file_size, resolved_log_path
@@ -331,8 +336,12 @@ async def poll_paldefender_logs_loop():
 
                 if last_file_path_seen != full_path:
                     last_file_path_seen = full_path
-                    last_file_size = 0
+                    last_file_size = size # Start at current size on new file detection to avoid memory spikes
                 
+                if size < last_file_size:
+                    # Log file was rotated or truncated
+                    last_file_size = 0
+
                 if size > last_file_size:
                     with sftp.open(full_path, 'r') as f:
                         f.seek(last_file_size)
@@ -350,13 +359,11 @@ async def poll_paldefender_logs_loop():
                     line_str = line.strip()
                     if not line_str: continue
                     
-                    # Relay to Discord channel cleanly (NO raw logs, NO IPs, NO metadata)
                     if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
                         p_name, p_msg = parse_and_clean_chat(line_str)
                         if p_msg:
                             await channel.send(f"💬 **{p_name}**: {p_msg}")
 
-                    # Check for exact standalone !daily command in chat logs
                     if re.search(r'\b!daily\b', line_str.lower()):
                         player_name, _ = parse_and_clean_chat(line_str)
                         if player_name:
@@ -380,8 +387,9 @@ async def poll_paldefender_logs_loop():
                                 asyncio.create_task(process_chat_daily_reward(player_name, player_name))
 
         except Exception as e:
-            logger.error(f"❌ SFTP Polling Error (Reconnecting...): {e}")
+            logger.error(f"❌ SFTP Polling Error / Session Refreshing: {e}")
             sftp = None
+            transport = None
 
         await asyncio.sleep(5)
 
