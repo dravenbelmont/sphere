@@ -66,10 +66,13 @@ SFTP_PORT = int(_sftp_port_val) if str(_sftp_port_val).isdigit() else 22
 SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
 SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
+# Set ENABLE_SFTP_POLLING="true" in environment variables ONLY if you wish to enable SFTP log reading.
+# Disabled by default to prevent Windows file locking crashes on PalServer.exe
+ENABLE_SFTP_POLLING = os.getenv("ENABLE_SFTP_POLLING", "false").lower() in ("true", "1", "yes")
+
 POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
     os.getenv("LOG_PATH"),
-    os.getenv("SERVER_LOG_PATH"),
     "/server-data/Pal/Binaries/Win64/PalDefender/chat.log",
     "/home/container/Pal/Binaries/Win64/PalDefender/chat.log",
     "/app/Pal/Binaries/Win64/PalDefender/chat.log",
@@ -90,7 +93,7 @@ DAILY_ITEMS = [
 ]
 
 SHOP_ITEMS = {
-    # --- Spheres ---
+    # Spheres
     "pal_sphere": {"name": "Pal Sphere", "id": "PalSphere", "price": 10, "category": "Spheres"},
     "mega_sphere": {"name": "Mega Sphere", "id": "MegaSphere", "price": 25, "category": "Spheres"},
     "giga_sphere": {"name": "Giga Sphere", "id": "GigaSphere", "price": 50, "category": "Spheres"},
@@ -99,20 +102,20 @@ SHOP_ITEMS = {
     "legend_sphere": {"name": "Legend Sphere", "id": "LegendSphere", "price": 500, "category": "Spheres"},
     "plasteel_sphere": {"name": "Plasteel Sphere", "id": "PlasteelSphere", "price": 800, "category": "Spheres"},
 
-    # --- Shields ---
+    # Shields
     "common_shield": {"name": "Common Shield", "id": "Armor_Shield_01", "price": 100, "category": "Shields"},
     "mega_shield": {"name": "Mega Shield", "id": "Armor_Shield_02", "price": 300, "category": "Shields"},
     "giga_shield": {"name": "Giga Shield", "id": "Armor_Shield_03", "price": 600, "category": "Shields"},
     "hyper_shield": {"name": "Hyper Shield", "id": "Armor_Shield_04", "price": 1200, "category": "Shields"},
     "ultra_shield": {"name": "Ultra Shield", "id": "Armor_Shield_05", "price": 2500, "category": "Shields"},
 
-    # --- Armors ---
+    # Armors
     "metal_armor": {"name": "Metal Armor", "id": "MetalArmor", "price": 400, "category": "Armors"},
     "refined_metal_armor": {"name": "Refined Metal Armor", "id": "RefinedMetalArmor", "price": 1000, "category": "Armors"},
     "pal_metal_armor": {"name": "Pal Metal Armor", "id": "PalMetalArmor", "price": 2500, "category": "Armors"},
     "plasteel_armor": {"name": "Plasteel Armor", "id": "PlasteelArmor", "price": 5000, "category": "Armors"},
 
-    # --- Guns ---
+    # Guns
     "musket": {"name": "Musket", "id": "Musket", "price": 200, "category": "Guns"},
     "handgun": {"name": "Made-in-Japan Handgun", "id": "Handgun", "price": 500, "category": "Guns"},
     "double_barrel": {"name": "Double-barreled Shotgun", "id": "DoubleBarrelShotgun", "price": 800, "category": "Guns"},
@@ -122,20 +125,20 @@ SHOP_ITEMS = {
     "laser_rifle": {"name": "Laser Rifle", "id": "LaserRifle", "price": 7500, "category": "Guns"},
     "gatling_gun": {"name": "Gatling Gun", "id": "GatlingGun", "price": 10000, "category": "Guns"},
 
-    # --- Ammo ---
+    # Ammo
     "normal_bullet": {"name": "Normal Bullet (x100)", "id": "Bullet_Normal", "price": 150, "category": "Ammo"},
     "assault_bullet": {"name": "Assault Rifle Bullet (x100)", "id": "Bullet_AssaultRifle", "price": 300, "category": "Ammo"},
     "shotgun_shell": {"name": "Shotgun Shell (x50)", "id": "Bullet_Shotgun", "price": 250, "category": "Ammo"},
     "rocket_ammo": {"name": "Rocket Ammo (x10)", "id": "RocketValue", "price": 500, "category": "Ammo"},
 
-    # --- Accessories ---
+    # Accessories
     "attack_ring": {"name": "Ring of Attack +2", "id": "RingOfAttack_02", "price": 3000, "category": "Accessories"},
     "defense_ring": {"name": "Ring of Defense +2", "id": "RingOfDefense_02", "price": 3000, "category": "Accessories"},
     "hp_ring": {"name": "Life Ring +2", "id": "RingOfHP_02", "price": 3000, "category": "Accessories"},
     "heat_undershirt": {"name": "Heat-Resistant Undershirt +2", "id": "HeatResistantUndershirt_02", "price": 2000, "category": "Accessories"},
     "cold_undershirt": {"name": "Cold-Resistant Undershirt +2", "id": "ColdResistantUndershirt_02", "price": 2000, "category": "Accessories"},
 
-    # --- Pal Saddles ---
+    # Saddles
     "direhowl_saddle": {"name": "Direhowl Saddle", "id": "DirehowlSaddle", "price": 500, "category": "Saddles"},
     "galeclaw_saddle": {"name": "Galeclaw Saddle", "id": "GaleclawSaddle", "price": 600, "category": "Saddles"},
     "faleris_saddle": {"name": "Faleris Saddle", "id": "FalerisSaddle", "price": 2000, "category": "Saddles"},
@@ -143,7 +146,7 @@ SHOP_ITEMS = {
     "frostallion_saddle": {"name": "Frostallion Saddle", "id": "FrostallionSaddle", "price": 5000, "category": "Saddles"},
     "jetragon_saddle": {"name": "Jetragon Saddle", "id": "JetragonSaddle", "price": 6000, "category": "Saddles"},
 
-    # --- Essentials / Resources ---
+    # Food & Consumables
     "cake": {"name": "Cake", "id": "Cake", "price": 250, "category": "Food & Consumables"}
 }
 
@@ -153,7 +156,9 @@ last_known_player_names = {}
 # 4. Database Init
 # -------------------------------------------------------------
 async def init_db():
-    if not DATABASE_URL: return
+    if not DATABASE_URL:
+        logger.warning("⚠️ DATABASE_URL not set. Database features disabled.")
+        return
     try:
         conn = await asyncpg.connect(DATABASE_URL)
         await conn.execute('''
@@ -168,7 +173,7 @@ async def init_db():
         await conn.close()
         logger.info("✅ Database initialized successfully.")
     except Exception as e:
-        logger.critical(f"Failed to connect to Supabase: {e}")
+        logger.critical(f"❌ Failed to connect to Database: {e}")
 
 # -------------------------------------------------------------
 # 5. Discord Bot Init
@@ -224,10 +229,7 @@ async def give_item_via_paldefender(player_uid: str, item_id: str, amount: int):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, headers=auth_header, timeout=10) as response:
-                if response.status in [200, 250]:
-                    return True
-                else:
-                    return False
+                return response.status in [200, 250]
     except Exception as e:
         logger.error(f"PalDefender give item exception: {e}")
         return False
@@ -242,13 +244,11 @@ async def send_rcon_command(command: str):
     try:
         reader, writer = await asyncio.open_connection(RCON_HOST, RCON_PORT)
         
-        # Authenticate
         auth_payload = struct.pack('<ii', 1, SERVERDATA_AUTH) + ADMIN_PASSWORD.encode('utf-8') + b'\x00\x00'
         writer.write(struct.pack('<i', len(auth_payload)) + auth_payload)
         await writer.drain()
         await reader.read(4096)
         
-        # Send Command
         cmd_payload = struct.pack('<ii', 2, SERVERDATA_EXECCOMMAND) + command.encode('utf-8') + b'\x00\x00'
         writer.write(struct.pack('<i', len(cmd_payload)) + cmd_payload)
         await writer.drain()
@@ -262,7 +262,7 @@ async def send_rcon_command(command: str):
         return False, str(e)
 
 # -------------------------------------------------------------
-# 7. Database & Item Reward Handlers (!daily)
+# 7. In-Game Daily Reward System
 # -------------------------------------------------------------
 async def process_chat_daily_reward(player_uid: str, player_name: str):
     if not DATABASE_URL:
@@ -298,7 +298,7 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
         for item in DAILY_ITEMS:
             await give_item_via_paldefender(player_uid, item["id"], item["amount"])
 
-        success_msg = f"@{player_name} Claimed! +{DAILY_SHOP_POINTS} Points, 10 Predator/Ancient Cores, 500 Dog Coins, 50 Cakes, 50k Gold!"
+        success_msg = f"@{player_name} Claimed! +{DAILY_SHOP_POINTS} Points, 10 Cores, 500 Dog Coins, 50 Cakes, 50k Gold!"
         if REST_API_URL and ADMIN_PASSWORD:
             await call_palworld_api("/announce", method="POST", payload={"message": success_msg})
             
@@ -307,33 +307,29 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
     finally:
         await conn.close()
 
-# -------------------------------------------------------------
-# 8. Strict Chat Sanitizer
-# -------------------------------------------------------------
 def parse_and_clean_chat(line_str: str):
     try:
         name_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
         player_name = name_match.group(1) if name_match else "Player"
-        
-        if "]: " in line_str:
-            message = line_str.split("]: ")[-1].strip()
-        else:
-            message = line_str
-            
+        message = line_str.split("]: ")[-1].strip() if "]: " in line_str else line_str
         return player_name, message
     except Exception:
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 9. Lightweight Non-Locking SFTP Chat Poller & Command Listener
+# 8. SFTP Chat Poller (Safe Toggle)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
-    if not SFTP_HOST or not SFTP_USER:
+    if not ENABLE_SFTP_POLLING:
+        logger.info("🛡️ SFTP log polling is DISABLED to prevent server file-lock crashes.")
         return
 
-    logger.info(f"📂 Starting lightweight SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
-    
+    if not SFTP_HOST or not SFTP_USER:
+        logger.warning("⚠️ SFTP Host or User missing. SFTP polling offline.")
+        return
+
+    logger.info(f"📂 Starting SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
     TARGET_LOG_FILE = os.getenv("PALDEFENDER_LOG_PATH") or "/server-data/Pal/Binaries/Win64/PalDefender/chat.log"
     last_file_size = 0
     transport = None
@@ -341,10 +337,10 @@ async def poll_paldefender_logs_loop():
 
     def connect_sftp():
         nonlocal transport, sftp
-        if sftp is not None:
+        if sftp:
             try: sftp.close()
             except: pass
-        if transport is not None:
+        if transport:
             try: transport.close()
             except: pass
         
@@ -357,7 +353,6 @@ async def poll_paldefender_logs_loop():
         try:
             if sftp is None or transport is None or not transport.is_active():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
-                logger.info("🔗 SFTP connection established / refreshed successfully.")
 
             def read_new_lines():
                 nonlocal last_file_size
@@ -365,7 +360,6 @@ async def poll_paldefender_logs_loop():
                 try:
                     stat_info = sftp.stat(path_to_use)
                 except Exception:
-                    # Search common fallback paths if default path is missing
                     found = None
                     for alt in POSSIBLE_LOG_PATHS:
                         if not alt: continue
@@ -383,7 +377,7 @@ async def poll_paldefender_logs_loop():
 
                 size = stat_info.st_size
                 if size < last_file_size:
-                    last_file_size = 0  # Log file rotated or truncated
+                    last_file_size = 0
 
                 new_lines = []
                 if size > last_file_size:
@@ -403,13 +397,11 @@ async def poll_paldefender_logs_loop():
                     line_str = line.strip()
                     if not line_str: continue
                     
-                    # Forward chat to Discord channel
                     if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
                         p_name, p_msg = parse_and_clean_chat(line_str)
                         if p_msg:
                             await channel.send(f"💬 **{p_name}**: {p_msg}")
 
-                    # In-game !daily trigger
                     if re.search(r'\b!daily\b', line_str.lower()):
                         player_name, _ = parse_and_clean_chat(line_str)
                         if player_name:
@@ -419,27 +411,18 @@ async def poll_paldefender_logs_loop():
                                     target_pid = pid
                                     break
                             
-                            if not target_pid:
-                                data, err = await call_palworld_api("/players", method="GET")
-                                if not err and data:
-                                    for p in data.get("players", []):
-                                        if p.get("name", "").lower() == player_name.lower():
-                                            target_pid = p.get("playeruid") or p.get("userid")
-                                            break
-                            
                             if target_pid:
                                 asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
 
         except Exception as e:
-            logger.error(f"❌ SFTP Polling Error: {e}")
+            logger.error(f"❌ SFTP Error: {e}")
             sftp = None
             transport = None
 
-        # 10s poll interval to prevent disk/file locking conflicts
-        await asyncio.sleep(10)
+        await asyncio.sleep(15)
 
 # -------------------------------------------------------------
-# 10. Automated Player Tracker Loop
+# 9. Player Tracker Loop
 # -------------------------------------------------------------
 async def poll_palworld_players_loop():
     global last_known_player_names
@@ -456,17 +439,17 @@ async def poll_palworld_players_loop():
                         if pid:
                             last_known_player_names[str(pid)] = pname
             except Exception as e:
-                logger.error(f"Player polling loop error: {e}")
+                logger.error(f"Player poll error: {e}")
                 
-        await asyncio.sleep(25)
+        await asyncio.sleep(30)
 
 # -------------------------------------------------------------
-# 11. Discord Bot Events & Commands
+# 10. Discord Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
     await init_db()
-    logger.info(f"✅ Bot connected as {bot.user}")
+    logger.info(f"✅ Sphere Bot ready as {bot.user}")
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
@@ -490,19 +473,18 @@ async def on_message(message):
 @bot.command(name="shop")
 async def shop(ctx, category: str = None):
     embed = discord.Embed(title="🛒 Palworld Community Shop", color=discord.Color.blue())
-    
     categories = {}
     for key, info in SHOP_ITEMS.items():
         cat = info['category']
         if category and cat.lower() != category.lower():
             continue
-        sell_price = int(info['price'] * 0.5) # Sell value is 50% of buy price
+        sell_price = int(info['price'] * 0.5)
         categories.setdefault(cat, []).append(f"`{key}`: **{info['name']}** (Buy: {info['price']} | Sell: {sell_price} pts)")
     
     for cat_name, items in categories.items():
         embed.add_field(name=cat_name, value="\n".join(items), inline=False)
     
-    embed.set_footer(text="Use !buy <item> [amount] to purchase or !sell <item> [amount] to trade items for points!")
+    embed.set_footer(text="Use !buy <item> [amount] to purchase or !sell <item> [amount] to sell items!")
     await ctx.send(embed=embed)
 
 @bot.command(name="buy")
@@ -513,7 +495,7 @@ async def buy(ctx, item_key: str, amount: int = 1):
     
     item_key = item_key.lower()
     if item_key not in SHOP_ITEMS:
-        await ctx.send(f"❌ Unknown item key `{item_key}`. Check `!shop` for available items.")
+        await ctx.send(f"❌ Unknown item `{item_key}`. Check `!shop` for items.")
         return
     
     if amount < 1: amount = 1
@@ -524,12 +506,12 @@ async def buy(ctx, item_key: str, amount: int = 1):
     try:
         user_row = await conn.fetchrow('SELECT player_uid, balance FROM users WHERE discord_id = $1', ctx.author.id)
         if not user_row or not user_row['player_uid']:
-            await ctx.send("❌ Your Discord account is not linked to an in-game Player UID yet. Participate in-game or link your account first.")
+            await ctx.send("❌ Your Discord account is not linked to an in-game Player UID.")
             return
         
         balance = user_row['balance'] or 0
         if balance < total_cost:
-            await ctx.send(f"❌ Insufficient points! You have **{balance}** points, but this costs **{total_cost}** points.")
+            await ctx.send(f"❌ Insufficient points! You have **{balance}** pts, need **{total_cost}** pts.")
             return
         
         player_uid = user_row['player_uid']
@@ -538,14 +520,14 @@ async def buy(ctx, item_key: str, amount: int = 1):
         
         success = await give_item_via_paldefender(player_uid, item['id'], amount)
         if success:
-            await ctx.send(f"✅ Successfully purchased **{amount}x {item['name']}** for **{total_cost} points**!")
+            await ctx.send(f"✅ Purchased **{amount}x {item['name']}** for **{total_cost} points**!")
         else:
             await conn.execute('UPDATE users SET balance = balance + $1 WHERE discord_id = $2', total_cost, ctx.author.id)
-            await ctx.send("❌ Failed to deliver items via PalDefender API. Points refunded.")
+            await ctx.send("❌ Delivery failed via PalDefender API. Points refunded.")
 
     except Exception as e:
-        logger.error(f"Buy command error: {e}")
-        await ctx.send(f"❌ An error occurred: {e}")
+        logger.error(f"Buy error: {e}")
+        await ctx.send(f"❌ Error: {e}")
     finally:
         await conn.close()
 
@@ -557,24 +539,21 @@ async def sell(ctx, item_key: str, amount: int = 1):
     
     item_key = item_key.lower()
     if item_key not in SHOP_ITEMS:
-        await ctx.send(f"❌ Unknown item key `{item_key}`. Check `!shop` for sellable items.")
+        await ctx.send(f"❌ Unknown item `{item_key}`.")
         return
     
     if amount < 1: amount = 1
     item = SHOP_ITEMS[item_key]
-    unit_sell_price = int(item['price'] * 0.5)
-    total_payout = unit_sell_price * amount
+    total_payout = int(item['price'] * 0.5) * amount
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         user_row = await conn.fetchrow('SELECT player_uid FROM users WHERE discord_id = $1', ctx.author.id)
         if not user_row or not user_row['player_uid']:
-            await ctx.send("❌ Your Discord account is not linked to an in-game Player UID yet.")
+            await ctx.send("❌ Your Discord account is not linked to a Player UID.")
             return
         
         player_uid = user_row['player_uid']
-        
-        # Execute PalDefender /delitem via RCON across player containers
         rcon_cmd = f"delitem {player_uid} {item['id']} {amount}"
         success, err = await send_rcon_command(rcon_cmd)
         
@@ -586,13 +565,13 @@ async def sell(ctx, item_key: str, amount: int = 1):
                 DO UPDATE SET balance = users.balance + $3
             ''', ctx.author.id, player_uid, total_payout)
             
-            await ctx.send(f"✅ Successfully sold **{amount}x {item['name']}** from your inventory for **{total_payout} points**!")
+            await ctx.send(f"✅ Sold **{amount}x {item['name']}** for **{total_payout} points**!")
         else:
-            await ctx.send(f"❌ Failed to remove items from your inventory via RCON: {err}")
+            await ctx.send(f"❌ RCON item deletion failed: {err}")
 
     except Exception as e:
-        logger.error(f"Sell command error: {e}")
-        await ctx.send(f"❌ An error occurred processing your sale: {e}")
+        logger.error(f"Sell error: {e}")
+        await ctx.send(f"❌ Error: {e}")
     finally:
         await conn.close()
 
@@ -605,18 +584,18 @@ async def resetdaily(ctx):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         await conn.execute('UPDATE users SET last_daily = NULL')
-        await ctx.send("🔄 Daily cooldowns have been successfully reset!")
+        await ctx.send("🔄 Daily cooldowns reset!")
     except Exception as e:
-        await ctx.send(f"Error resetting cooldown: {e}")
+        await ctx.send(f"Error resetting daily: {e}")
     finally:
         await conn.close()
 
 # -------------------------------------------------------------
-# 12. Web Server & Main Execution
+# 11. Web Server & Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
-    app.router.add_get("/", lambda r: web.Response(text="OK"))
+    app.router.add_get("/", lambda r: web.Response(text="Sphere Bot Active"))
     
     runner = web.AppRunner(app)
     await runner.setup()
