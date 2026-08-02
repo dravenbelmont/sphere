@@ -6,6 +6,8 @@ import stat
 import re
 import struct
 from datetime import datetime, timedelta, timezone
+
+import aiohttp
 from aiohttp import web
 import discord
 from discord.ext import commands
@@ -283,7 +285,7 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
                 return
             else:
                 new_bal = (row['balance'] or 0) + DAILY_SHOP_POINTS
-                await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $1', new_bal, now, str(player_uid))
+                await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
         else:
             dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
             new_bal = DAILY_SHOP_POINTS
