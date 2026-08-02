@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import stat
 from datetime import datetime, timedelta, timezone
 from aiohttp import web
 import discord
@@ -45,7 +46,7 @@ SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
 
-# Correct PalDefender log path
+# Correct PalDefender root path
 PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
@@ -128,7 +129,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. SFTP Log Poller
+# 7. Robust SFTP Log Poller (Handles Directories & Files)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -137,47 +138,66 @@ async def poll_paldefender_logs_loop():
         return
 
     logger.info(f"📂 Starting SFTP log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
-    last_file_name = None
+    last_file_path_seen = None
     last_file_size = 0
 
     while not bot.is_closed():
         try:
             def check_logs():
-                nonlocal last_file_name, last_file_size
+                nonlocal last_file_path_seen, last_file_size
                 transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
                 transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
                 sftp = paramiko.SFTPClient.from_transport(transport)
                 
                 try:
-                    files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
-                    if not files:
+                    def find_latest_file(current_dir):
+                        try:
+                            entries = sftp.listdir_attr(current_dir)
+                        except Exception:
+                            return None
+                        
+                        candidates = []
+                        for entry in entries:
+                            if entry.filename.startswith('.'):
+                                continue
+                            path = f"{current_dir.rstrip('/')}/{entry.filename}"
+                            try:
+                                mode = entry.st_mode
+                                if stat.S_ISDIR(mode):
+                                    sub = find_latest_file(path)
+                                    if sub:
+                                        candidates.append(sub)
+                                elif stat.S_ISREG(mode):
+                                    candidates.append((path, entry.filename, entry.st_mtime, entry.st_size))
+                            except Exception:
+                                continue
+                        
+                        if not candidates:
+                            return None
+                        candidates.sort(key=lambda x: x[2], reverse=True)
+                        return candidates[0]
+
+                    latest = find_latest_file(PALDEFENDER_LOG_PATH)
+                    if not latest:
                         sftp.close()
                         transport.close()
                         return []
 
-                    log_files = [f for f in files if not f.filename.startswith('.')]
-                    if not log_files:
-                        sftp.close()
-                        transport.close()
-                        return []
-
-                    log_files.sort(key=lambda x: x.st_mtime, reverse=True)
-                    latest_file = log_files[0]
-                    current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
-
+                    full_path, filename, mtime, size = latest
                     new_lines = []
-                    if last_file_name != latest_file.filename:
-                        logger.info(f"🔄 New log file detected: {latest_file.filename}")
-                        last_file_name = latest_file.filename
-                        last_file_size = 0  # Reset size for new file rotation
+
+                    if last_file_path_seen != full_path:
+                        logger.info(f"🔄 New log file detected: {filename} ({full_path})")
+                        last_file_path_seen = full_path
+                        last_file_size = 0
                     
-                    if latest_file.st_size > last_file_size:
-                        with sftp.open(current_file_path, 'r') as f:
+                    if size > last_file_size:
+                        with sftp.open(full_path, 'r') as f:
                             f.seek(last_file_size)
                             content = f.read().decode('utf-8', errors='ignore')
                             if content:
                                 new_lines = content.splitlines()
-                        last_file_size = latest_file.st_size
+                        last_file_size = size
 
                     sftp.close()
                     transport.close()
