@@ -46,7 +46,7 @@ SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
 
-# Correct PalDefender root path
+# PalDefender root path
 PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
@@ -129,7 +129,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Robust SFTP Log Poller (Handles Directories & Files)
+# 7. SFTP Chat-Only Log Poller (Filtered to prevent spam)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -137,7 +137,7 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP chat watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_path_seen = None
     last_file_size = 0
 
@@ -187,7 +187,7 @@ async def poll_paldefender_logs_loop():
                     new_lines = []
 
                     if last_file_path_seen != full_path:
-                        logger.info(f"🔄 New log file detected: {filename} ({full_path})")
+                        logger.info(f"🔄 Tracking log file for chat: {filename} ({full_path})")
                         last_file_path_seen = full_path
                         last_file_size = 0
                     
@@ -207,13 +207,28 @@ async def poll_paldefender_logs_loop():
                     transport.close()
                     raise e
 
-            new_lines = await asyncio.to_thread(check_logs)
+            raw_lines = await asyncio.to_thread(check_logs)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
-            if channel and new_lines:
-                for line in new_lines:
+            if channel and raw_lines:
+                for line in raw_lines:
                     line_str = line.strip()
-                    if line_str:
+                    if not line_str:
+                        continue
+                    
+                    line_lower = line_str.lower()
+
+                    # Filter out system logs, errors, warnings, debug info, and plugin init spam
+                    skip_keywords = [
+                        "loaded", "initializing", "success", "error", "warning", 
+                        "debug", "hook", "plugin", "version", "path", "file", 
+                        "connecting", "auth", "sftp", "info", "started", "stopped"
+                    ]
+                    if any(kw in line_lower for kw in skip_keywords):
+                        continue
+
+                    # Strict check: only process lines that look like in-game player chat (contains chat tag or message separator)
+                    if "[chat]" in line_lower or ":" in line_str:
                         await channel.send(f"💬 {line_str}")
 
         except Exception as e:
