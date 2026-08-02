@@ -38,13 +38,15 @@ RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
 
-# SFTP Credentials for reading Pal Defender logs from the game server
+# SFTP Credentials
 SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip().strip("[]()").strip()
 _sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
 SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
-PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/palworld/Pal/Binaries/Win64/PalDefender").strip()
+
+# Correct PalDefender log path
+PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
 # 3. Daily Login Pack & Shop Items
@@ -94,7 +96,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 6. Palworld REST API Helpers (Supports Port 27014)
+# 6. Palworld REST API Helpers (Port 27014 Support)
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -126,15 +128,15 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Pal Defender SFTP Log Poller
+# 7. SFTP Log Poller
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not SFTP_HOST or not SFTP_USER:
-        logger.info("⚠️ SFTP credentials not provided. Pal Defender SFTP log polling disabled.")
+        logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_name = None
     last_file_size = 0
 
@@ -153,15 +155,21 @@ async def poll_paldefender_logs_loop():
                         transport.close()
                         return []
 
-                    files.sort(key=lambda x: x.st_mtime, reverse=True)
-                    latest_file = files[0]
+                    log_files = [f for f in files if not f.filename.startswith('.')]
+                    if not log_files:
+                        sftp.close()
+                        transport.close()
+                        return []
+
+                    log_files.sort(key=lambda x: x.st_mtime, reverse=True)
+                    latest_file = log_files[0]
                     current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
 
                     new_lines = []
                     if last_file_name != latest_file.filename:
-                        logger.info(f"🔄 New Pal Defender log file detected: {latest_file.filename}")
+                        logger.info(f"🔄 New log file detected: {latest_file.filename}")
                         last_file_name = latest_file.filename
-                        last_file_size = 0  # Reset size to 0 for new file rotation
+                        last_file_size = 0  # Reset size for new file rotation
                     
                     if latest_file.st_size > last_file_size:
                         with sftp.open(current_file_path, 'r') as f:
@@ -368,4 +376,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
