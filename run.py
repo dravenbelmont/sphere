@@ -124,7 +124,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Pal Defender SFTP Log Poller (Robust Diagnostics)
+# 7. Pal Defender SFTP Log Poller (Audited & Robust)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -134,40 +134,27 @@ async def poll_paldefender_logs_loop():
 
     logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_name = None
-    last_file_size = 0
-    logged_home_debug = False
+    last_file_size = -1
 
     while not bot.is_closed():
         try:
             def check_logs():
-                nonlocal last_file_name, last_file_size, logged_home_debug
+                nonlocal last_file_name, last_file_size
                 transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
                 transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
                 sftp = paramiko.SFTPClient.from_transport(transport)
                 
                 try:
-                    try:
-                        files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
-                    except Exception as path_err:
-                        if not logged_home_debug:
-                            logger.error(f"❌ Failed to read path '{PALDEFENDER_LOG_PATH}': {path_err}")
-                            try:
-                                home_dir = sftp.normalize('.')
-                                logger.info(f"📁 SFTP Connected Home Directory: {home_dir}")
-                                logger.info(f"📁 Contents of Home Directory: {[f.filename for f in sftp.listdir_attr(home_dir)]}")
-                            except Exception as home_err:
-                                logger.error(f"❌ Could not list home directory: {home_err}")
-                            logged_home_debug = True
-                        sftp.close()
-                        transport.close()
-                        raise path_err
-
-                    log_files = [f for f in files if f.filename.endswith(('.log', '.txt'))]
+                    files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
+                    # Filter out directories, keep actual files
+                    log_files = [f for f in files if not stat.S_ISDIR(f.st_mode)] if 'stat' in globals() else [f for f in files]
+                    
                     if not log_files:
                         sftp.close()
                         transport.close()
                         return []
 
+                    # Sort by modification time to get the newest log file
                     log_files.sort(key=lambda x: x.st_mtime, reverse=True)
                     latest_file = log_files[0]
                     current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
@@ -205,7 +192,7 @@ async def poll_paldefender_logs_loop():
         except Exception as e:
             logger.error(f"❌ SFTP Log Polling Error: {e}")
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(3)
 
 # -------------------------------------------------------------
 # 8. Automated Login Daily Reward & Player Tracking Loop
