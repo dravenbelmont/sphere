@@ -124,7 +124,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Pal Defender SFTP Log Poller
+# 7. Pal Defender SFTP Log Poller (With Debug Logging)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -135,17 +135,23 @@ async def poll_paldefender_logs_loop():
     logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_name = None
     last_file_size = 0
+    debug_counter = 0
 
     while not bot.is_closed():
         try:
             def check_logs():
-                nonlocal last_file_name, last_file_size
+                nonlocal last_file_name, last_file_size, debug_counter
                 transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
                 transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
                 sftp = paramiko.SFTPClient.from_transport(transport)
                 
                 try:
                     files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
+                    
+                    # Log directory contents once every minute for debugging
+                    if debug_counter % 20 == 0:
+                        logger.info(f"🔍 [DEBUG] Contents of {PALDEFENDER_LOG_PATH}: {[f.filename for f in files]}")
+                    
                     log_files = [f for f in files if f.filename.endswith(('.log', '.txt'))]
                     if not log_files:
                         sftp.close()
@@ -177,6 +183,7 @@ async def poll_paldefender_logs_loop():
                     transport.close()
                     raise e
 
+            debug_counter += 1
             new_lines = await asyncio.to_thread(check_logs)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
@@ -187,7 +194,7 @@ async def poll_paldefender_logs_loop():
                         await channel.send(f"💬 {line_str}")
 
         except Exception as e:
-            logger.error(f"SFTP Log Polling Error: {e}")
+            logger.error(f"❌ SFTP Log Polling Error: {e}")
 
         await asyncio.sleep(3)
 
