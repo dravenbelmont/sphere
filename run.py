@@ -397,7 +397,7 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(25)
 
 # -------------------------------------------------------------
-# 9. Discord Commands & Event Listeners
+# 9. Discord Commands, Events & Global Error Handling
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -407,6 +407,19 @@ async def on_ready():
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
         bot.loop.create_task(poll_paldefender_logs_loop())
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Global error handler to prevent silent failures in Discord."""
+    if isinstance(error, commands.CommandNotFound):
+        pass # Ignore typos
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ **Missing argument!** You need to provide the player ID.\nExample: `{ctx.prefix}{ctx.command.name} 1234567890`")
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ **Access Denied!** You do not have the required Administrator permissions to use this command.")
+    else:
+        await ctx.send(f"⚠️ **An error occurred:** {error}")
+        logger.error(f"Command Error: {error}")
 
 @bot.event
 async def on_message(message):
