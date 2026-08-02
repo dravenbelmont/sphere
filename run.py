@@ -47,7 +47,7 @@ SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = (os.getenv("SFTP_USER") or os.getenv("SFTP_USERNAME") or "").strip().strip("[]()").strip()
 SFTP_PASSWORD = (os.getenv("SFTP_PASSWORD") or os.getenv("SFTP_PASS") or ADMIN_PASSWORD).strip().strip("[]()").strip()
 
-# Self-healing path fallbacks for different hosting panels (Pterodactyl, Docker, Custom Linux)
+# Self-healing path fallbacks for different hosting panels
 POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
     os.getenv("LOG_PATH"),
@@ -139,7 +139,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Self-Healing SFTP Chat Poller & Parser
+# 7. Self-Healing SFTP Chat Poller (Persistent Connection)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -152,111 +152,100 @@ async def poll_paldefender_logs_loop():
     last_file_size = 0
     resolved_log_path = None
 
+    # Keep transport and SFTP connection open persistently
+    transport = None
+    sftp = None
+
+    def connect_sftp():
+        nonlocal transport, sftp
+        if sftp is not None:
+            try:
+                sftp.close()
+                transport.close()
+            except: pass
+        t = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+        t.connect(username=SFTP_USER, password=SFTP_PASSWORD)
+        return t, paramiko.SFTPClient.from_transport(t)
+
     while not bot.is_closed():
         try:
+            if sftp is None or transport is None or not transport.is_active():
+                transport, sftp = await asyncio.to_thread(connect_sftp)
+                logger.info("✅ Established persistent SFTP connection.")
+
             def check_logs():
                 nonlocal last_file_path_seen, last_file_size, resolved_log_path
-                transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-                transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
-                sftp = paramiko.SFTPClient.from_transport(transport)
                 
-                try:
-                    # Self-heal path discovery if not resolved yet
-                    if not resolved_log_path:
-                        paths_to_test = [p for p in POSSIBLE_LOG_PATHS if p]
-                        for test_path in paths_to_test:
-                            try:
-                                sftp.stat(test_path)
-                                resolved_log_path = test_path
-                                logger.info(f"✅ Successfully auto-discovered log path: {resolved_log_path}")
-                                break
-                            except Exception:
-                                continue
-                        
-                        if not resolved_log_path:
-                            # Fallback search from root / or home directory
-                            try:
-                                root_dirs = ['', '/home/container', '/server-data', '/app']
-                                for r in root_dirs:
-                                    try:
-                                        for entry in sftp.listdir(r or '.'):
-                                            if 'pal' in entry.lower() or 'binaries' in entry.lower():
-                                                potential = f"{r}/{entry}/Binaries/Win64/PalDefender" if r else f"{entry}/Binaries/Win64/PalDefender"
-                                                sftp.stat(potential)
-                                                resolved_log_path = potential
-                                                logger.info(f"✅ Self-healed path via recursive scan: {resolved_log_path}")
-                                                break
-                                    except Exception:
-                                        continue
-                            except Exception:
-                                pass
-
+                # Self-heal path discovery if not resolved yet
+                if not resolved_log_path:
+                    paths_to_test = [p for p in POSSIBLE_LOG_PATHS if p]
+                    for test_path in paths_to_test:
+                        try:
+                            sftp.stat(test_path)
+                            resolved_log_path = test_path
+                            logger.info(f"✅ Successfully auto-discovered log path: {resolved_log_path}")
+                            break
+                        except Exception:
+                            continue
+                    
                     if not resolved_log_path:
                         resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender" # Ultimate default fallback
 
-                    def find_chat_file(current_dir):
-                        chat_candidates = []
-                        all_candidates = []
-                        try:
-                            entries = sftp.listdir_attr(current_dir)
-                        except Exception:
-                            return None
-                        
-                        for entry in entries:
-                            if entry.filename.startswith('.'):
-                                continue
-                            path = f"{current_dir.rstrip('/')}/{entry.filename}"
-                            try:
-                                mode = entry.st_mode
-                                if stat.S_ISDIR(mode):
-                                    sub = find_chat_file(path)
-                                    if sub:
-                                        all_candidates.append(sub)
-                                elif stat.S_ISREG(mode):
-                                    file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
-                                    all_candidates.append(file_info)
-                                    if 'chat' in entry.filename.lower() or 'log' in entry.filename.lower():
-                                        chat_candidates.append(file_info)
-                            except Exception:
-                                continue
-                        
-                        if chat_candidates:
-                            chat_candidates.sort(key=lambda x: x[2], reverse=True)
-                            return chat_candidates[0]
-                        if all_candidates:
-                            all_candidates.sort(key=lambda x: x[2], reverse=True)
-                            return all_candidates[0]
+                def find_chat_file(current_dir):
+                    chat_candidates = []
+                    all_candidates = []
+                    try:
+                        entries = sftp.listdir_attr(current_dir)
+                    except Exception:
                         return None
-
-                    latest = find_chat_file(resolved_log_path)
-                    if not latest:
-                        sftp.close()
-                        transport.close()
-                        return []
-
-                    full_path, filename, mtime, size = latest
-                    new_lines = []
-
-                    if last_file_path_seen != full_path:
-                        logger.info(f"🔄 Locked onto chat log file: {filename} ({full_path})")
-                        last_file_path_seen = full_path
-                        last_file_size = 0
                     
-                    if size > last_file_size:
-                        with sftp.open(full_path, 'r') as f:
-                            f.seek(last_file_size)
-                            content = f.read().decode('utf-8', errors='ignore')
-                            if content:
-                                new_lines = content.splitlines()
-                        last_file_size = size
+                    for entry in entries:
+                        if entry.filename.startswith('.'):
+                            continue
+                        path = f"{current_dir.rstrip('/')}/{entry.filename}"
+                        try:
+                            mode = entry.st_mode
+                            if stat.S_ISDIR(mode):
+                                sub = find_chat_file(path)
+                                if sub:
+                                    all_candidates.append(sub)
+                            elif stat.S_ISREG(mode):
+                                file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
+                                all_candidates.append(file_info)
+                                if 'chat' in entry.filename.lower() or 'log' in entry.filename.lower():
+                                    chat_candidates.append(file_info)
+                        except Exception:
+                            continue
+                    
+                    if chat_candidates:
+                        chat_candidates.sort(key=lambda x: x[2], reverse=True)
+                        return chat_candidates[0]
+                    if all_candidates:
+                        all_candidates.sort(key=lambda x: x[2], reverse=True)
+                        return all_candidates[0]
+                    return None
 
-                    sftp.close()
-                    transport.close()
-                    return new_lines
-                except Exception as e:
-                    sftp.close()
-                    transport.close()
-                    raise e
+                latest = find_chat_file(resolved_log_path)
+                if not latest:
+                    return []
+
+                full_path, filename, mtime, size = latest
+                new_lines = []
+
+                if last_file_path_seen != full_path:
+                    logger.info(f"🔄 Locked onto chat log file: {filename} ({full_path})")
+                    last_file_path_seen = full_path
+                    last_file_size = 0
+                
+                if size > last_file_size:
+                    with sftp.open(full_path, 'r') as f:
+                        f.seek(last_file_size)
+                        content = f.read().decode('utf-8', errors='ignore')
+                        if content:
+                            new_lines = content.splitlines()
+                    last_file_size = size
+
+                return new_lines
 
             raw_lines = await asyncio.to_thread(check_logs)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
@@ -264,32 +253,25 @@ async def poll_paldefender_logs_loop():
             if channel and raw_lines:
                 for line in raw_lines:
                     line_str = line.strip()
-                    if not line_str:
-                        continue
+                    if not line_str: continue
                     
                     line_lower = line_str.lower()
-                    
-                    # Target chat lines (flexible match for any chat log variant)
-                    if "chat" not in line_lower and "global" not in line_lower:
-                        continue
+                    if "chat" not in line_lower and "global" not in line_lower: continue
 
-                    player_name = None
-                    message_text = None
+                    player_name, message_text = None, None
 
-                    # Tier 1: Precise regex for standard PalDefender log line
+                    # Tier 1
                     chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'", line_str, re.IGNORECASE)
                     if chat_match:
                         player_name = chat_match.group(1).strip()
-                        # Extract everything after the last colon and bracket combination
                         msg_match = re.search(r"\]:\s*(.*)$", line_str)
                         if msg_match:
                             message_text = msg_match.group(1).strip()
 
-                    # Tier 2: Fallback lenient parser if Tier 1 misses
+                    # Tier 2
                     if not player_name or not message_text:
                         parts = line_str.split(':')
                         if len(parts) >= 3:
-                            # Look for quotes holding the name
                             quote_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
                             if quote_match:
                                 player_name = quote_match.group(1).strip()
@@ -299,9 +281,11 @@ async def poll_paldefender_logs_loop():
                         await channel.send(f"💬 **{player_name}**: {message_text}")
 
         except Exception as e:
-            logger.error(f"❌ SFTP Chat Polling Error: {e}")
+            logger.error(f"❌ SFTP Chat Polling Error (Reconnecting...): {e}")
+            sftp = None # Force a reconnect on the next loop iteration
 
-        await asyncio.sleep(3)
+        # Rate-limiting backoff
+        await asyncio.sleep(10)
 
 # -------------------------------------------------------------
 # 8. Automated Login Daily Reward & Player Tracking Loop
@@ -408,7 +392,8 @@ async def poll_palworld_players_loop():
             except Exception as e:
                 logger.error(f"Player polling loop error: {e}")
                 
-        await asyncio.sleep(5)
+        # Rate-limiting backoff
+        await asyncio.sleep(25)
 
 # -------------------------------------------------------------
 # 9. Discord Commands & Event Listeners
