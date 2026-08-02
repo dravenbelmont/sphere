@@ -23,10 +23,9 @@ logging.basicConfig(
 logger = logging.getLogger("PalBot")
 
 # -------------------------------------------------------------
-# 2. Dynamic Environment Variable Scanner (Strict Port Prioritization)
+# 2. Dynamic Environment Variable Scanner
 # -------------------------------------------------------------
 def find_env_val(*patterns, default=""):
-    """Scans all os.environ keys dynamically for any matching keyword patterns."""
     for k, v in os.environ.items():
         k_low = k.lower()
         if any(p in k_low for p in patterns):
@@ -36,18 +35,15 @@ def find_env_val(*patterns, default=""):
     return default
 
 def find_env_val_multi(*pattern_sets, default=""):
-    """Scans os.environ using multiple fallback pattern sets."""
     for patterns in pattern_sets:
         val = find_env_val(*patterns)
         if val:
             return val
     return default
 
-# Explicitly prioritize Render's standard PORT variable to fix port-binding errors
 _port_val = os.getenv("PORT") or find_env_val("web_port") or "10000"
 WEB_PORT = int(_port_val) if str(_port_val).isdigit() else 10000
 
-# Automatically discover all other configuration keys dynamically
 DISCORD_TOKEN = find_env_val_multi(("discord_token",), ("bot_token",), ("token",))
 BOT_PREFIX = find_env_val("prefix") or "!"
 REST_API_URL = find_env_val_multi(("rest_api",), ("palworld_api",), ("api_url",), ("api",))
@@ -55,20 +51,16 @@ ADMIN_PASSWORD = find_env_val_multi(("admin_pass",), ("rcon_pass",), ("admin",),
 DATABASE_URL = find_env_val_multi(("database",), ("supabase",), ("db_url",), ("db",))
 
 RCON_HOST = find_env_val_multi(("rcon_host",), ("server_ip",), ("host",), ("ip",)) or "127.0.0.1"
-_rcon_port_val = find_env_val("rcon_port") or "25575"
-RCON_PORT = int(_rcon_port_val) if str(_rcon_port_val).isdigit() else 25575
-
 _channel_val = find_env_val_multi(("chat_channel",), ("channel_id",), ("channel",)) or "0"
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if str(_channel_val).isdigit() else 0
 
-# SFTP Credentials (Dynamic Fallbacks)
+# SFTP Credentials
 SFTP_HOST = find_env_val_multi(("sftp_host",), ("ftp_host",)) or RCON_HOST
 _sftp_port_val = find_env_val("sftp_port") or "22"
 SFTP_PORT = int(_sftp_port_val) if str(_sftp_port_val).isdigit() else 22
 SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
 SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
-# Self-healing path fallbacks for different hosting panels
 POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
     os.getenv("LOG_PATH"),
@@ -81,7 +73,7 @@ POSSIBLE_LOG_PATHS = [
 ]
 
 # -------------------------------------------------------------
-# 3. Daily Login Pack & Shop Items
+# 3. Daily Reward & Shop Configurations
 # -------------------------------------------------------------
 DAILY_PACK_SHOP_POINTS = 1000
 SHOP_ITEMS = {
@@ -90,6 +82,8 @@ SHOP_ITEMS = {
     "stone": {"name": "Stone", "id": "Stone", "price": 1, "category": "Ores & Materials"},
     "cake": {"name": "Cake", "id": "Cake", "price": 250, "category": "Food & Consumables"}
 }
+
+last_known_player_names = {}
 
 # -------------------------------------------------------------
 # 4. Database Init
@@ -146,21 +140,59 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
                         return {"text": text}, None
                 else:
                     return None, f"HTTP {response.status}"
-    except aiohttp.ClientConnectorError:
-        return None, "Server offline / starting up (Connection Refused)"
     except Exception as e:
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Self-Healing SFTP Chat Poller (Persistent Connection)
+# 7. Database Reward Handlers
+# -------------------------------------------------------------
+async def process_chat_daily_reward(player_uid: str, player_name: str):
+    if not DATABASE_URL:
+        return
+    
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        row = await conn.fetchrow('SELECT discord_id, balance, last_daily FROM users WHERE player_uid = $1', str(player_uid))
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        
+        if row:
+            last_daily = row['last_daily']
+            if last_daily and now < last_daily + timedelta(hours=24):
+                remaining = (last_daily + timedelta(hours=24)) - now
+                hours = int(remaining.total_seconds() // 3600)
+                mins = int((remaining.total_seconds() % 3600) // 60)
+                msg = f"@{player_name} Daily already claimed! Available in {hours}h {mins}m."
+            else:
+                new_bal = (row['balance'] or 0) + DAILY_PACK_SHOP_POINTS
+                await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
+                msg = f"@{player_name} Success! +{DAILY_PACK_SHOP_POINTS} shop points added. Balance: {new_bal}"
+        else:
+            dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
+            new_bal = DAILY_PACK_SHOP_POINTS
+            await conn.execute('''
+                INSERT INTO users (discord_id, player_uid, balance, last_daily)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
+            ''', dummy_discord_id, str(player_uid), new_bal, now)
+            msg = f"@{player_name} Registered! +{DAILY_PACK_SHOP_POINTS} shop points added."
+
+        if REST_API_URL and ADMIN_PASSWORD:
+            await call_palworld_api("/announce", method="POST", payload={"message": msg})
+            
+    except Exception as e:
+        logger.error(f"Error processing in-game daily for {player_name}: {e}")
+    finally:
+        await conn.close()
+
+# -------------------------------------------------------------
+# 8. SFTP Chat Poller & In-Game Command Listener
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not SFTP_HOST or not SFTP_USER:
-        logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting Self-Healing SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
+    logger.info(f"📂 Starting SFTP chat poller & in-game command listener on {SFTP_HOST}:{SFTP_PORT}")
     last_file_path_seen = None
     last_file_size = 0
     resolved_log_path = None
@@ -183,44 +215,36 @@ async def poll_paldefender_logs_loop():
         try:
             if sftp is None or transport is None or not transport.is_active():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
-                logger.info("✅ Established persistent SFTP connection.")
 
             def check_logs():
                 nonlocal last_file_path_seen, last_file_size, resolved_log_path
                 
                 if not resolved_log_path:
-                    paths_to_test = [p for p in POSSIBLE_LOG_PATHS if p]
-                    for test_path in paths_to_test:
+                    for test_path in [p for p in POSSIBLE_LOG_PATHS if p]:
                         try:
                             sftp.stat(test_path)
                             resolved_log_path = test_path
-                            logger.info(f"✅ Successfully auto-discovered log path: {resolved_log_path}")
                             break
                         except Exception:
                             continue
-                    
                     if not resolved_log_path:
                         resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender"
 
                 def find_chat_file(current_dir):
-                    chat_candidates = []
-                    all_candidates = []
+                    chat_candidates, all_candidates = [], []
                     try:
                         entries = sftp.listdir_attr(current_dir)
                     except Exception:
                         return None
                     
                     for entry in entries:
-                        if entry.filename.startswith('.'):
-                            continue
+                        if entry.filename.startswith('.'): continue
                         path = f"{current_dir.rstrip('/')}/{entry.filename}"
                         try:
-                            mode = entry.st_mode
-                            if stat.S_ISDIR(mode):
+                            if stat.S_ISDIR(entry.st_mode):
                                 sub = find_chat_file(path)
-                                if sub:
-                                    all_candidates.append(sub)
-                            elif stat.S_ISREG(mode):
+                                if sub: all_candidates.append(sub)
+                            elif stat.S_ISREG(entry.st_mode):
                                 file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
                                 all_candidates.append(file_info)
                                 if 'chat' in entry.filename.lower() or 'log' in entry.filename.lower():
@@ -237,14 +261,12 @@ async def poll_paldefender_logs_loop():
                     return None
 
                 latest = find_chat_file(resolved_log_path)
-                if not latest:
-                    return []
+                if not latest: return []
 
                 full_path, filename, mtime, size = latest
                 new_lines = []
 
                 if last_file_path_seen != full_path:
-                    logger.info(f"🔄 Locked onto chat log file: {filename} ({full_path})")
                     last_file_path_seen = full_path
                     last_file_size = 0
                 
@@ -252,8 +274,7 @@ async def poll_paldefender_logs_loop():
                     with sftp.open(full_path, 'r') as f:
                         f.seek(last_file_size)
                         content = f.read().decode('utf-8', errors='ignore')
-                        if content:
-                            new_lines = content.splitlines()
+                        if content: new_lines = content.splitlines()
                     last_file_size = size
 
                 return new_lines
@@ -261,22 +282,19 @@ async def poll_paldefender_logs_loop():
             raw_lines = await asyncio.to_thread(check_logs)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
-            if channel and raw_lines:
+            if raw_lines:
                 for line in raw_lines:
                     line_str = line.strip()
                     if not line_str: continue
-                    
                     line_lower = line_str.lower()
                     if "chat" not in line_lower and "global" not in line_lower: continue
 
                     player_name, message_text = None, None
-
                     chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'", line_str, re.IGNORECASE)
                     if chat_match:
                         player_name = chat_match.group(1).strip()
                         msg_match = re.search(r"\]:\s*(.*)$", line_str)
-                        if msg_match:
-                            message_text = msg_match.group(1).strip()
+                        if msg_match: message_text = msg_match.group(1).strip()
 
                     if not player_name or not message_text:
                         parts = line_str.split(':')
@@ -287,55 +305,42 @@ async def poll_paldefender_logs_loop():
                                 message_text = parts[-1].strip()
 
                     if player_name and message_text:
-                        await channel.send(f"💬 **{player_name}**: {message_text}")
+                        if channel:
+                            await channel.send(f"💬 **{player_name}**: {message_text}")
+
+                        # In-Game Chat Command Handler: !daily
+                        if message_text.lower().startswith("!daily"):
+                            target_pid = None
+                            for pid, name in last_known_player_names.items():
+                                if name.lower() == player_name.lower():
+                                    target_pid = pid
+                                    break
+                            
+                            if not target_pid:
+                                data, err = await call_palworld_api("/players", method="GET")
+                                if not err and data:
+                                    for p in data.get("players", []):
+                                        if p.get("name", "").lower() == player_name.lower():
+                                            target_pid = p.get("playeruid") or p.get("userid")
+                                            break
+                            
+                            if target_pid:
+                                asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
+                            else:
+                                if REST_API_URL and ADMIN_PASSWORD:
+                                    await call_palworld_api("/announce", method="POST", payload={"message": f"@{player_name} You must be active on the server to claim daily rewards!"})
 
         except Exception as e:
-            logger.error(f"❌ SFTP Chat Polling Error (Reconnecting...): {e}")
+            logger.error(f"❌ SFTP Polling Error (Reconnecting...): {e}")
             sftp = None
 
         await asyncio.sleep(10)
 
 # -------------------------------------------------------------
-# 8. Automated Login Daily Reward & Player Tracking Loop
+# 9. Automated Player Tracker Loop
 # -------------------------------------------------------------
 known_online_players = set()
-last_known_player_names = {}
 is_players_initialized = False
-
-async def process_login_daily(player_uid: str, player_name: str, account_id: str):
-    if not DATABASE_URL:
-        return
-    
-    conn = await asyncpg.connect(DATABASE_URL)
-    try:
-        row = await conn.fetchrow('SELECT discord_id, balance, last_daily FROM users WHERE player_uid = $1', str(player_uid))
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        
-        if row:
-            last_daily = row['last_daily']
-            if last_daily and now < last_daily + timedelta(hours=24):
-                return
-            
-            new_bal = (row['balance'] or 0) + DAILY_PACK_SHOP_POINTS
-            await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
-        else:
-            dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
-            new_bal = DAILY_PACK_SHOP_POINTS
-            await conn.execute('''
-                INSERT INTO users (discord_id, player_uid, balance, last_daily)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
-            ''', dummy_discord_id, str(player_uid), new_bal, now)
-
-        # Broadcast reward notification via working REST API
-        if REST_API_URL and ADMIN_PASSWORD:
-            msg = f"Welcome back {player_name}! Your daily login reward of {DAILY_PACK_SHOP_POINTS} shop points has been added."
-            await call_palworld_api("/announce", method="POST", payload={"message": msg})
-            
-    except Exception as e:
-        logger.error(f"Error processing login daily pack for {player_name}: {e}")
-    finally:
-        await conn.close()
 
 async def poll_palworld_players_loop():
     global known_online_players, last_known_player_names, is_players_initialized
@@ -352,10 +357,8 @@ async def poll_palworld_players_loop():
                     for p in players:
                         pid = p.get("playeruid") or p.get("userid") or p.get("name")
                         pname = p.get("name", "Unknown")
-                        account_id = p.get("userId") or p.get("userid") or p.get("accountId") or p.get("accountid") or "Unknown ID"
-                        
                         if pid:
-                            current_players_map[str(pid)] = {"name": pname, "account_id": account_id}
+                            current_players_map[str(pid)] = pname
                             last_known_player_names[str(pid)] = pname
 
                     current_ids = set(current_players_map.keys())
@@ -364,36 +367,20 @@ async def poll_palworld_players_loop():
                     if not is_players_initialized:
                         known_online_players = current_ids
                         is_players_initialized = True
-                        for pid, pdata in current_players_map.items():
-                            asyncio.create_task(process_login_daily(pid, pdata["name"], pdata["account_id"]))
                     else:
                         joined_ids = current_ids - known_online_players
                         left_ids = known_online_players - current_ids
 
                         for jid in joined_ids:
-                            pdata = current_players_map.get(jid, {"name": "A player", "account_id": "Unknown ID"})
-                            name = pdata["name"]
-                            account_id = pdata["account_id"]
-                            
-                            logger.info(f"Player join detected: {name} (ID: {account_id})")
-                            asyncio.create_task(process_login_daily(jid, name, account_id))
-
+                            name = current_players_map.get(jid, "A player")
                             if channel:
-                                embed = discord.Embed(
-                                    title="🟢 Player Joined",
-                                    description=f"**{name}** has joined the server!\n**Steam / Console ID:** `{account_id}`",
-                                    color=discord.Color.green()
-                                )
+                                embed = discord.Embed(title="🟢 Player Joined", description=f"**{name}** has joined the server!", color=discord.Color.green())
                                 await channel.send(embed=embed)
 
                         for lid in left_ids:
                             name = last_known_player_names.get(lid, "A player")
                             if channel:
-                                embed = discord.Embed(
-                                    title="🔴 Player Left",
-                                    description=f"**{name}** has left the server.",
-                                    color=discord.Color.red()
-                                )
+                                embed = discord.Embed(title="🔴 Player Left", description=f"**{name}** has left the server.", color=discord.Color.red())
                                 await channel.send(embed=embed)
 
                         known_online_players = current_ids
@@ -403,7 +390,7 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(25)
 
 # -------------------------------------------------------------
-# 9. Discord Commands, Events & Global Error Handling
+# 10. Discord Bot Events & Startup
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -415,36 +402,19 @@ async def on_ready():
         bot.loop.create_task(poll_paldefender_logs_loop())
 
 @bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        pass 
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ **Missing argument!** You need to provide the player ID.\nExample: `{ctx.prefix}{ctx.command.name} 1234567890`")
-    elif isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ **Access Denied!** You do not have the required Administrator permissions to use this command.")
-    else:
-        await ctx.send(f"⚠️ **An error occurred:** {error}")
-        logger.error(f"Command Error: {error}")
-
-@bot.event
 async def on_message(message):
     await bot.process_commands(message)
+    if message.author.bot: return
     
-    if message.author.bot:
-        return
-        
     if DISCORD_CHAT_CHANNEL_ID != 0 and message.channel.id == DISCORD_CHAT_CHANNEL_ID:
         if not message.content.startswith(BOT_PREFIX):
             if REST_API_URL and ADMIN_PASSWORD:
                 try:
                     clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
                     chat_text = f"[{message.author.display_name}] {clean_msg}"
-                    
-                    _, error = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
-                    if error and "Server offline" not in error:
-                        logger.error(f"Failed to relay message via REST API: {error}")
-                except Exception as e:
-                    logger.error(f"Failed to relay Discord message to game server: {e}")
+                    await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
+                except Exception:
+                    pass
 
 @bot.command(name="shop")
 async def shop(ctx):
@@ -453,22 +423,8 @@ async def shop(ctx):
         embed.add_field(name=item_info['name'], value=f"Cost: {item_info['price']} points\nID: `{item_key}`", inline=False)
     await ctx.send(embed=embed)
 
-@bot.command(name="givedaily")
-@commands.has_permissions(administrator=True)
-async def givedaily(ctx, account_id: str):
-    """Credits daily reward points to a player profile via the database economy."""
-    try:
-        embed = discord.Embed(
-            title="🛠️ Daily Points System", 
-            description=f"External RCON port 25575 is restricted by your game host to localhost. Daily rewards are managed automatically via database point balances for ID: `{account_id}`.",
-            color=discord.Color.yellow()
-        )
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Error: {e}")
-
 # -------------------------------------------------------------
-# 10. Web Server & Main Execution
+# 11. Web Server & Main Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
