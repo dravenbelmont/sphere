@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import sys
-import json
 from datetime import datetime, timedelta, timezone
 from aiohttp import web
 import discord
@@ -10,6 +9,7 @@ from discord.ext import commands
 import asyncpg
 import aiohttp
 from gamercon_async import GameRCON
+import paramiko
 
 # -------------------------------------------------------------
 # 1. Logging Setup
@@ -37,6 +37,14 @@ RCON_PORT = int(_rcon_port_val) if _rcon_port_val.isdigit() else 25575
 
 _channel_val = (os.getenv("DISCORD_CHAT_CHANNEL_ID") or os.getenv("CHANNEL_ID") or "0").strip().strip("[]()").strip()
 DISCORD_CHAT_CHANNEL_ID = int(_channel_val) if _channel_val.isdigit() else 0
+
+# SFTP Credentials for reading Pal Defender logs from the game server
+SFTP_HOST = os.getenv("SFTP_HOST", RCON_HOST).strip().strip("[]()").strip()
+_sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
+SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
+SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
+SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
+PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
 # 3. Daily Login Pack & Shop Items
@@ -116,7 +124,75 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Automated Login Daily Reward & Player Tracking Loop
+# 7. Pal Defender SFTP Log Poller
+# -------------------------------------------------------------
+async def poll_paldefender_logs_loop():
+    await bot.wait_until_ready()
+    if not SFTP_HOST or not SFTP_USER:
+        logger.info("⚠️ SFTP credentials not provided. Pal Defender SFTP log polling disabled.")
+        return
+
+    logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    last_file_name = None
+    last_file_size = 0
+
+    while not bot.is_closed():
+        try:
+            def check_logs():
+                nonlocal last_file_name, last_file_size
+                transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
+                transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
+                sftp = paramiko.SFTPClient.from_transport(transport)
+                
+                try:
+                    files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
+                    log_files = [f for f in files if f.filename.endswith(('.log', '.txt'))]
+                    if not log_files:
+                        sftp.close()
+                        transport.close()
+                        return []
+
+                    log_files.sort(key=lambda x: x.st_mtime, reverse=True)
+                    latest_file = log_files[0]
+                    current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
+
+                    new_lines = []
+                    if last_file_name != latest_file.filename:
+                        logger.info(f"🔄 New Pal Defender log file detected: {latest_file.filename}")
+                        last_file_name = latest_file.filename
+                        last_file_size = latest_file.st_size
+                    elif latest_file.st_size > last_file_size:
+                        with sftp.open(current_file_path, 'r') as f:
+                            f.seek(last_file_size)
+                            content = f.read().decode('utf-8', errors='ignore')
+                            if content:
+                                new_lines = content.splitlines()
+                        last_file_size = latest_file.st_size
+
+                    sftp.close()
+                    transport.close()
+                    return new_lines
+                except Exception as e:
+                    sftp.close()
+                    transport.close()
+                    raise e
+
+            new_lines = await asyncio.to_thread(check_logs)
+            channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
+
+            if channel and new_lines:
+                for line in new_lines:
+                    line_str = line.strip()
+                    if line_str:
+                        await channel.send(f"💬 {line_str}")
+
+        except Exception as e:
+            logger.error(f"SFTP Log Polling Error: {e}")
+
+        await asyncio.sleep(3)
+
+# -------------------------------------------------------------
+# 8. Automated Login Daily Reward & Player Tracking Loop
 # -------------------------------------------------------------
 known_online_players = set()
 last_known_player_names = {}
@@ -223,23 +299,6 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 8. Webhook Handler for Pal Defender / Game Chat
-# -------------------------------------------------------------
-async def handle_chat_webhook(request):
-    try:
-        raw_body = await request.text()
-        logger.info(f"📥 Incoming Webhook Payload: {raw_body}")
-        
-        channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID)
-        if channel and raw_body:
-            await channel.send(f"💬 {raw_body}")
-            
-        return web.Response(text="OK", status=200)
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return web.Response(text="OK", status=200)
-
-# -------------------------------------------------------------
 # 9. Discord Commands & Event Listeners
 # -------------------------------------------------------------
 @bot.event
@@ -249,6 +308,7 @@ async def on_ready():
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
+        bot.loop.create_task(poll_paldefender_logs_loop())
 
 @bot.event
 async def on_message(message):
@@ -296,8 +356,6 @@ async def givedaily(ctx, account_id: str):
 async def main():
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="OK"))
-    app.router.add_post("/webhook", handle_chat_webhook)
-    app.router.add_post("/chat", handle_chat_webhook)
     
     runner = web.AppRunner(app)
     await runner.setup()
