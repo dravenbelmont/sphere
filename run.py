@@ -70,11 +70,11 @@ POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
     os.getenv("LOG_PATH"),
     os.getenv("SERVER_LOG_PATH"),
-    "/server-data/Pal/Binaries/Win64/PalDefender",
-    "/home/container/Pal/Binaries/Win64/PalDefender",
-    "/app/Pal/Binaries/Win64/PalDefender",
-    "./Pal/Binaries/Win64/PalDefender",
-    "/Pal/Binaries/Win64/PalDefender"
+    "/server-data/Pal/Binaries/Win64/PalDefender/chat.log",
+    "/home/container/Pal/Binaries/Win64/PalDefender/chat.log",
+    "/app/Pal/Binaries/Win64/PalDefender/chat.log",
+    "./Pal/Binaries/Win64/PalDefender/chat.log",
+    "/Pal/Binaries/Win64/PalDefender/chat.log"
 ]
 
 # -------------------------------------------------------------
@@ -325,18 +325,17 @@ def parse_and_clean_chat(line_str: str):
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 9. Hardened SFTP Poller & In-Game Command Listener
+# 9. Lightweight Non-Locking SFTP Chat Poller & Command Listener
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not SFTP_HOST or not SFTP_USER:
         return
 
-    logger.info(f"📂 Starting hardened SFTP chat poller & listener on {SFTP_HOST}:{SFTP_PORT}")
-    last_file_path_seen = None
+    logger.info(f"📂 Starting lightweight SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
+    
+    TARGET_LOG_FILE = os.getenv("PALDEFENDER_LOG_PATH") or "/server-data/Pal/Binaries/Win64/PalDefender/chat.log"
     last_file_size = 0
-    resolved_log_path = None
-
     transport = None
     sftp = None
 
@@ -360,73 +359,43 @@ async def poll_paldefender_logs_loop():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
                 logger.info("🔗 SFTP connection established / refreshed successfully.")
 
-            def check_logs():
-                nonlocal last_file_path_seen, last_file_size, resolved_log_path
-                
-                if not resolved_log_path:
-                    for test_path in [p for p in POSSIBLE_LOG_PATHS if p]:
+            def read_new_lines():
+                nonlocal last_file_size
+                path_to_use = TARGET_LOG_FILE
+                try:
+                    stat_info = sftp.stat(path_to_use)
+                except Exception:
+                    # Search common fallback paths if default path is missing
+                    found = None
+                    for alt in POSSIBLE_LOG_PATHS:
+                        if not alt: continue
                         try:
-                            sftp.stat(test_path)
-                            resolved_log_path = test_path
+                            sftp.stat(alt)
+                            found = alt
                             break
                         except Exception:
                             continue
-                    if not resolved_log_path:
-                        resolved_log_path = "/server-data/Pal/Binaries/Win64/PalDefender"
+                    if found:
+                        path_to_use = found
+                        stat_info = sftp.stat(path_to_use)
+                    else:
+                        return []
 
-                def find_chat_file(current_dir):
-                    chat_candidates, all_candidates = [], []
-                    try:
-                        entries = sftp.listdir_attr(current_dir)
-                    except Exception:
-                        return None
-                    
-                    for entry in entries:
-                        if entry.filename.startswith('.'): continue
-                        path = f"{current_dir.rstrip('/')}/{entry.filename}"
-                        try:
-                            if stat.S_ISDIR(entry.st_mode):
-                                sub = find_chat_file(path)
-                                if sub: all_candidates.append(sub)
-                            elif stat.S_ISREG(entry.st_mode):
-                                file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
-                                all_candidates.append(file_info)
-                                if 'chat' in entry.filename.lower() or 'log' in entry.filename.lower():
-                                    chat_candidates.append(file_info)
-                        except Exception:
-                            continue
-                    
-                    if chat_candidates:
-                        chat_candidates.sort(key=lambda x: x[2], reverse=True)
-                        return chat_candidates[0]
-                    if all_candidates:
-                        all_candidates.sort(key=lambda x: x[2], reverse=True)
-                        return all_candidates[0]
-                    return None
-
-                latest = find_chat_file(resolved_log_path)
-                if not latest: return []
-
-                full_path, filename, mtime, size = latest
-                new_lines = []
-
-                if last_file_path_seen != full_path:
-                    last_file_path_seen = full_path
-                    last_file_size = size
-                
+                size = stat_info.st_size
                 if size < last_file_size:
-                    last_file_size = 0
+                    last_file_size = 0  # Log file rotated or truncated
 
+                new_lines = []
                 if size > last_file_size:
-                    with sftp.open(full_path, 'r') as f:
+                    with sftp.open(path_to_use, 'r') as f:
                         f.seek(last_file_size)
                         content = f.read().decode('utf-8', errors='ignore')
-                        if content: new_lines = content.splitlines()
+                        if content:
+                            new_lines = content.splitlines()
                     last_file_size = size
-
                 return new_lines
 
-            raw_lines = await asyncio.to_thread(check_logs)
+            raw_lines = await asyncio.to_thread(read_new_lines)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
             if raw_lines:
@@ -434,11 +403,13 @@ async def poll_paldefender_logs_loop():
                     line_str = line.strip()
                     if not line_str: continue
                     
+                    # Forward chat to Discord channel
                     if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
                         p_name, p_msg = parse_and_clean_chat(line_str)
                         if p_msg:
                             await channel.send(f"💬 **{p_name}**: {p_msg}")
 
+                    # In-game !daily trigger
                     if re.search(r'\b!daily\b', line_str.lower()):
                         player_name, _ = parse_and_clean_chat(line_str)
                         if player_name:
@@ -464,7 +435,8 @@ async def poll_paldefender_logs_loop():
             sftp = None
             transport = None
 
-        await asyncio.sleep(5)
+        # 10s poll interval to prevent disk/file locking conflicts
+        await asyncio.sleep(10)
 
 # -------------------------------------------------------------
 # 10. Automated Player Tracker Loop
