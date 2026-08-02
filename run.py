@@ -73,9 +73,17 @@ POSSIBLE_LOG_PATHS = [
 ]
 
 # -------------------------------------------------------------
-# 3. Daily Reward & Shop Configurations
+# 3. Daily Reward Configuration (#dailyinGame)
 # -------------------------------------------------------------
-DAILY_PACK_SHOP_POINTS = 1000
+DAILY_SHOP_POINTS = 500
+DAILY_ITEMS = [
+    {"id": "PredatorCore", "amount": 10, "name": "Predator Cores"},
+    {"id": "AncientCore", "amount": 10, "name": "Ancient Cores"},
+    {"id": "DogCoin", "amount": 500, "name": "Dog Coins"},
+    {"id": "Cake", "amount": 50, "name": "Special Cakes"},
+    {"id": "GoldCoin", "amount": 50000, "name": "Gold"}
+]
+
 SHOP_ITEMS = {
     "pal_sphere": {"name": "Pal Sphere", "id": "PalSphere", "price": 25, "category": "Spheres"},
     "wood": {"name": "Wood", "id": "Wood", "price": 1, "category": "Ores & Materials"},
@@ -114,14 +122,14 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 6. Palworld REST API Helpers
+# 6. Palworld & PalDefender REST API Helpers
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
         return None, "REST_API_URL or ADMIN_PASSWORD missing."
     
     base_url = REST_API_URL.rstrip('/')
-    if not base_url.endswith('/v1/api'):
+    if not base_url.endswith('/v1/api') and not base_url.endswith('/v1/pdapi'):
         if base_url.endswith('/v1'): base_url += '/api'
         else: base_url += '/v1/api'
             
@@ -143,8 +151,30 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
     except Exception as e:
         return None, str(e)
 
+async def give_item_via_paldefender(player_uid: str, item_id: str, amount: int):
+    if not REST_API_URL or not ADMIN_PASSWORD:
+        return False
+    
+    base_url = REST_API_URL.rstrip('/')
+    if '/v1/api' in base_url:
+        base_url = base_url.replace('/v1/api', '/v1/pdapi')
+    elif not base_url.endswith('/v1/pdapi'):
+        base_url += '/v1/pdapi'
+        
+    url = f"{base_url}/give/items/"
+    payload = {"userid": str(player_uid), "item_id": item_id, "amount": int(amount)}
+    auth_header = {"Authorization": aiohttp.encode_basic_auth("admin", ADMIN_PASSWORD)}
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=auth_header, timeout=10) as response:
+                return response.status == 250 or response.status == 200
+    except Exception as e:
+        logger.error(f"PalDefender give item error for {item_id}: {e}")
+        return False
+
 # -------------------------------------------------------------
-# 7. Database Reward Handlers
+# 7. Database & Item Reward Handlers (#dailyinGame)
 # -------------------------------------------------------------
 async def process_chat_daily_reward(player_uid: str, player_name: str):
     if not DATABASE_URL:
@@ -162,22 +192,28 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
                 hours = int(remaining.total_seconds() // 3600)
                 mins = int((remaining.total_seconds() % 3600) // 60)
                 msg = f"@{player_name} Daily already claimed! Available in {hours}h {mins}m."
+                if REST_API_URL and ADMIN_PASSWORD:
+                    await call_palworld_api("/announce", method="POST", payload={"message": msg})
+                return
             else:
-                new_bal = (row['balance'] or 0) + DAILY_PACK_SHOP_POINTS
+                new_bal = (row['balance'] or 0) + DAILY_SHOP_POINTS
                 await conn.execute('UPDATE users SET balance = $1, last_daily = $2 WHERE player_uid = $3', new_bal, now, str(player_uid))
-                msg = f"@{player_name} Success! +{DAILY_PACK_SHOP_POINTS} shop points added. Balance: {new_bal}"
         else:
             dummy_discord_id = abs(hash(str(player_uid))) % (10**15)
-            new_bal = DAILY_PACK_SHOP_POINTS
+            new_bal = DAILY_SHOP_POINTS
             await conn.execute('''
                 INSERT INTO users (discord_id, player_uid, balance, last_daily)
                 VALUES ($1, $2, $3, $4)
                 ON CONFLICT (player_uid) DO UPDATE SET last_daily = $4, balance = users.balance + $3
             ''', dummy_discord_id, str(player_uid), new_bal, now)
-            msg = f"@{player_name} Registered! +{DAILY_PACK_SHOP_POINTS} shop points added."
 
+        # Grant physical items via PalDefender API
+        for item in DAILY_ITEMS:
+            await give_item_via_paldefender(player_uid, item["id"], item["amount"])
+
+        success_msg = f"@{player_name} Claimed! +{DAILY_SHOP_POINTS} Points, 10 Predator Cores, 10 Ancient Cores, 500 Dog Coins, 50 Cakes, 50k Gold!"
         if REST_API_URL and ADMIN_PASSWORD:
-            await call_palworld_api("/announce", method="POST", payload={"message": msg})
+            await call_palworld_api("/announce", method="POST", payload={"message": success_msg})
             
     except Exception as e:
         logger.error(f"Error processing in-game daily for {player_name}: {e}")
@@ -185,14 +221,14 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
         await conn.close()
 
 # -------------------------------------------------------------
-# 8. SFTP Chat Poller & In-Game Command Listener (!daily)
+# 8. SFTP Chat Poller & In-Game Command Listener (#dailyinGame)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
     if not SFTP_HOST or not SFTP_USER:
         return
 
-    logger.info(f"📂 Starting SFTP chat poller & in-game command listener on {SFTP_HOST}:{SFTP_PORT}")
+    logger.info(f"📂 Starting SFTP chat poller & listener for #dailyinGame on {SFTP_HOST}:{SFTP_PORT}")
     last_file_path_seen = None
     last_file_size = 0
     resolved_log_path = None
@@ -287,15 +323,12 @@ async def poll_paldefender_logs_loop():
                     line_str = line.strip()
                     if not line_str: continue
                     
-                    # Forward to Discord chat channel if configured
                     if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
                         await channel.send(f"💬 `{line_str}`")
 
-                    # Flexible check for '!daily' command in chat logs
-                    if "!daily" in line_str.lower():
+                    # Check for #dailyinGame command in chat logs
+                    if "#dailyingame" in line_str.lower():
                         player_name = None
-                        
-                        # Try to extract player name from quotes or brackets in log lines
                         match_quotes = re.findall(r"['\"]([^'\"]+)['\"]", line_str)
                         if match_quotes:
                             player_name = match_quotes[0]
@@ -322,7 +355,6 @@ async def poll_paldefender_logs_loop():
                             if target_pid:
                                 asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
                             else:
-                                # Fallback using player name directly as identifier if UID lookup fails
                                 asyncio.create_task(process_chat_daily_reward(player_name, player_name))
 
         except Exception as e:
