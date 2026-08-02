@@ -66,21 +66,30 @@ SFTP_PORT = int(_sftp_port_val) if str(_sftp_port_val).isdigit() else 22
 SFTP_USER = find_env_val_multi(("sftp_user",), ("ftp_user",), ("username",))
 SFTP_PASSWORD = find_env_val_multi(("sftp_pass",), ("ftp_pass",)) or ADMIN_PASSWORD
 
-# Enabled by default so in-game chat reaches Discord properly
 ENABLE_SFTP_POLLING = os.getenv("ENABLE_SFTP_POLLING", "true").lower() in ("true", "1", "yes")
 
+# Targeted Paths & Directories including /Logs folder
 POSSIBLE_LOG_PATHS = [
     os.getenv("PALDEFENDER_LOG_PATH"),
     os.getenv("LOG_PATH"),
+    "/server-data/Pal/Binaries/Win64/PalDefender/Logs/chat.log",
     "/server-data/Pal/Binaries/Win64/PalDefender/chat.log",
+    "/home/container/Pal/Binaries/Win64/PalDefender/Logs/chat.log",
     "/home/container/Pal/Binaries/Win64/PalDefender/chat.log",
-    "/app/Pal/Binaries/Win64/PalDefender/chat.log",
-    "./Pal/Binaries/Win64/PalDefender/chat.log",
-    "/Pal/Binaries/Win64/PalDefender/chat.log"
+    "./Pal/Binaries/Win64/PalDefender/Logs/chat.log",
+    "./Pal/Binaries/Win64/PalDefender/chat.log"
+]
+
+POSSIBLE_LOG_DIRS = [
+    "/server-data/Pal/Binaries/Win64/PalDefender/Logs",
+    "/server-data/Pal/Binaries/Win64/PalDefender",
+    "/home/container/Pal/Binaries/Win64/PalDefender/Logs",
+    "/home/container/Pal/Binaries/Win64/PalDefender",
+    "./Pal/Binaries/Win64/PalDefender/Logs"
 ]
 
 # -------------------------------------------------------------
-# 3. Daily Reward & Expanded Shop Configuration
+# 3. Daily Reward & Shop Items
 # -------------------------------------------------------------
 DAILY_SHOP_POINTS = 500
 DAILY_ITEMS = [
@@ -182,7 +191,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 
 # -------------------------------------------------------------
-# 6. Palworld & PalDefender REST / RCON Helpers
+# 6. REST API & RCON Helpers
 # -------------------------------------------------------------
 async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = None):
     if not REST_API_URL or not ADMIN_PASSWORD:
@@ -321,10 +330,10 @@ def parse_and_clean_chat(line_str: str):
             else:
                 player_name = "Player"
 
-        # Completely strip IPv4 addresses (e.g. 192.168.1.1 or 127.0.0.1:25575)
+        # Strip any IPv4 address (e.g. 192.168.1.1 or 127.0.0.1:25575)
         player_name = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b', '', player_name)
         
-        # Strip leftover brackets/parentheses and redundant spaces
+        # Strip brackets, parentheses, and extra whitespace
         player_name = re.sub(r'[\(\)\[\]<>]', '', player_name)
         player_name = re.sub(r'\s+', ' ', player_name).strip()
         
@@ -344,7 +353,7 @@ def parse_and_clean_chat(line_str: str):
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 9. SFTP Chat Poller Loop
+# 9. SFTP Chat Poller Loop (Single-Discovery & Lock-In)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -357,10 +366,11 @@ async def poll_paldefender_logs_loop():
         return
 
     logger.info(f"📂 Starting SFTP chat poller on {SFTP_HOST}:{SFTP_PORT}")
-    TARGET_LOG_FILE = os.getenv("PALDEFENDER_LOG_PATH") or "/server-data/Pal/Binaries/Win64/PalDefender/chat.log"
-    last_file_size = 0
+    
     transport = None
     sftp = None
+    locked_log_path = None
+    last_file_size = 0
 
     def connect_sftp():
         nonlocal transport, sftp
@@ -376,39 +386,65 @@ async def poll_paldefender_logs_loop():
         t.connect(username=SFTP_USER, password=SFTP_PASSWORD)
         return t, paramiko.SFTPClient.from_transport(t)
 
+    def discover_and_lock_log():
+        nonlocal locked_log_path, last_file_size
+        
+        # 1. Check direct file path targets
+        for candidate in POSSIBLE_LOG_PATHS:
+            if not candidate: continue
+            try:
+                sftp.stat(candidate)
+                locked_log_path = candidate
+                logger.info(f"🔒 Locked onto active log file: {locked_log_path}")
+                return
+            except Exception:
+                continue
+
+        # 2. Check directory listing if explicit paths failed
+        for log_dir in POSSIBLE_LOG_DIRS:
+            try:
+                files = sftp.listdir(log_dir)
+                log_files = [f for f in files if f.endswith('.log')]
+                if log_files:
+                    log_files.sort()
+                    latest = log_files[-1]
+                    locked_log_path = f"{log_dir.rstrip('/')}/{latest}"
+                    logger.info(f"🔒 Discovered and locked onto log file in {log_dir}: {locked_log_path}")
+                    return
+            except Exception:
+                continue
+
     while not bot.is_closed():
         try:
             if sftp is None or transport is None or not transport.is_active():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
+                locked_log_path = None # Reset lock on new SFTP session
 
-            def read_new_lines():
-                nonlocal last_file_size
-                path_to_use = TARGET_LOG_FILE
-                try:
-                    stat_info = sftp.stat(path_to_use)
-                except Exception:
-                    found = None
-                    for alt in POSSIBLE_LOG_PATHS:
-                        if not alt: continue
-                        try:
-                            sftp.stat(alt)
-                            found = alt
-                            break
-                        except Exception:
-                            continue
-                    if found:
-                        path_to_use = found
-                        stat_info = sftp.stat(path_to_use)
-                    else:
+            def read_locked_file():
+                nonlocal locked_log_path, last_file_size
+                
+                # Perform discovery ONCE if not currently locked onto a file
+                if not locked_log_path:
+                    discover_and_lock_log()
+                    if not locked_log_path:
                         return []
+
+                try:
+                    stat_info = sftp.stat(locked_log_path)
+                except Exception as e:
+                    logger.warning(f"⚠️ Lost handle on {locked_log_path} (Server Restart?): {e}")
+                    locked_log_path = None
+                    last_file_size = 0
+                    return []
 
                 size = stat_info.st_size
                 if size < last_file_size:
+                    # Log file truncated/reset on 24h server restart
                     last_file_size = 0
 
                 new_lines = []
                 if size > last_file_size:
-                    with sftp.open(path_to_use, 'r') as f:
+                    with sftp.open(locked_log_path, 'r') as f:
                         f.seek(last_file_size)
                         content = f.read().decode('utf-8', errors='ignore')
                         if content:
@@ -416,7 +452,7 @@ async def poll_paldefender_logs_loop():
                     last_file_size = size
                 return new_lines
 
-            raw_lines = await asyncio.to_thread(read_new_lines)
+            raw_lines = await asyncio.to_thread(read_locked_file)
             channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
 
             if raw_lines:
@@ -442,9 +478,10 @@ async def poll_paldefender_logs_loop():
                                 asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
 
         except Exception as e:
-            logger.error(f"❌ SFTP Polling Exception: {e}")
+            logger.error(f"❌ SFTP Loop Exception: {e}")
             sftp = None
             transport = None
+            locked_log_path = None
 
         await asyncio.sleep(10)
 
