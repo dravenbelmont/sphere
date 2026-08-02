@@ -321,8 +321,8 @@ async def process_login_daily(player_uid: str, player_name: str, account_id: str
 
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
             for item in DAILY_PACK_ITEMS:
-                # Updated to use PalDefender give command
-                await rcon.send(f"/defender item give {account_id} {item['rcon_id']} {item['quantity']}")
+                # Removed the slash for PalDefender RCON command
+                await rcon.send(f"defender item give {account_id} {item['rcon_id']} {item['quantity']}")
             await rcon.send(f"Broadcast Welcome back {player_name}! Your daily login pack has been delivered.")
             
     except Exception as e:
@@ -441,13 +441,24 @@ async def givedaily(ctx, account_id: str):
     """Manually gives the daily reward pack to a specific Steam/Console ID using PalDefender."""
     try:
         async with GameRCON(RCON_HOST, RCON_PORT, ADMIN_PASSWORD, timeout=10) as rcon:
+            responses = []
             for item in DAILY_PACK_ITEMS:
-                # Updated to use PalDefender give command
-                await rcon.send(f"/defender item give {account_id} {item['rcon_id']} {item['quantity']}")
+                # Removed the '/' because RCON usually doesn't accept chat prefixes
+                cmd = f"defender item give {account_id} {item['rcon_id']} {item['quantity']}"
+                response = await rcon.send(cmd)
+                
+                # Clean up the response for Discord
+                clean_response = response.strip() if response else "No response from server"
+                responses.append(f"**{item['rcon_id']}**: `{clean_response}`")
             
-        await ctx.send(f"✅ Successfully sent the daily pack to Steam/Console ID: `{account_id}`")
+        embed = discord.Embed(
+            title="🛠️ RCON Debug Output", 
+            description=f"Sent commands for ID: `{account_id}`\n\n" + "\n".join(responses),
+            color=discord.Color.yellow()
+        )
+        await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"❌ Failed to send items: {e}")
+        await ctx.send(f"❌ Failed to send items via RCON: {e}")
 
 # -------------------------------------------------------------
 # 10. Web Server & Main Execution
