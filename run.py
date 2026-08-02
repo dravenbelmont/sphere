@@ -129,7 +129,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. SFTP Chat-Only Log Poller (Filtered to prevent spam)
+# 7. Dedicated SFTP Chat Poller (Prioritizes Chat Logs)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -137,7 +137,7 @@ async def poll_paldefender_logs_loop():
         logger.info("⚠️ SFTP credentials not provided. Log polling disabled.")
         return
 
-    logger.info(f"📂 Starting SFTP chat watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
+    logger.info(f"📂 Starting SFTP dedicated chat poller on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_path_seen = None
     last_file_size = 0
 
@@ -150,13 +150,14 @@ async def poll_paldefender_logs_loop():
                 sftp = paramiko.SFTPClient.from_transport(transport)
                 
                 try:
-                    def find_latest_file(current_dir):
+                    def find_chat_file(current_dir):
+                        chat_candidates = []
+                        all_candidates = []
                         try:
                             entries = sftp.listdir_attr(current_dir)
                         except Exception:
                             return None
                         
-                        candidates = []
                         for entry in entries:
                             if entry.filename.startswith('.'):
                                 continue
@@ -164,20 +165,26 @@ async def poll_paldefender_logs_loop():
                             try:
                                 mode = entry.st_mode
                                 if stat.S_ISDIR(mode):
-                                    sub = find_latest_file(path)
+                                    sub = find_chat_file(path)
                                     if sub:
-                                        candidates.append(sub)
+                                        all_candidates.append(sub)
                                 elif stat.S_ISREG(mode):
-                                    candidates.append((path, entry.filename, entry.st_mtime, entry.st_size))
+                                    file_info = (path, entry.filename, entry.st_mtime, entry.st_size)
+                                    all_candidates.append(file_info)
+                                    if 'chat' in entry.filename.lower():
+                                        chat_candidates.append(file_info)
                             except Exception:
                                 continue
                         
-                        if not candidates:
-                            return None
-                        candidates.sort(key=lambda x: x[2], reverse=True)
-                        return candidates[0]
+                        if chat_candidates:
+                            chat_candidates.sort(key=lambda x: x[2], reverse=True)
+                            return chat_candidates[0]
+                        if all_candidates:
+                            all_candidates.sort(key=lambda x: x[2], reverse=True)
+                            return all_candidates[0]
+                        return None
 
-                    latest = find_latest_file(PALDEFENDER_LOG_PATH)
+                    latest = find_chat_file(PALDEFENDER_LOG_PATH)
                     if not latest:
                         sftp.close()
                         transport.close()
@@ -187,7 +194,7 @@ async def poll_paldefender_logs_loop():
                     new_lines = []
 
                     if last_file_path_seen != full_path:
-                        logger.info(f"🔄 Tracking log file for chat: {filename} ({full_path})")
+                        logger.info(f"🔄 Locked onto chat log file: {filename} ({full_path})")
                         last_file_path_seen = full_path
                         last_file_size = 0
                     
@@ -213,26 +220,11 @@ async def poll_paldefender_logs_loop():
             if channel and raw_lines:
                 for line in raw_lines:
                     line_str = line.strip()
-                    if not line_str:
-                        continue
-                    
-                    line_lower = line_str.lower()
-
-                    # Filter out system logs, errors, warnings, debug info, and plugin init spam
-                    skip_keywords = [
-                        "loaded", "initializing", "success", "error", "warning", 
-                        "debug", "hook", "plugin", "version", "path", "file", 
-                        "connecting", "auth", "sftp", "info", "started", "stopped"
-                    ]
-                    if any(kw in line_lower for kw in skip_keywords):
-                        continue
-
-                    # Strict check: only process lines that look like in-game player chat (contains chat tag or message separator)
-                    if "[chat]" in line_lower or ":" in line_str:
+                    if line_str:
                         await channel.send(f"💬 {line_str}")
 
         except Exception as e:
-            logger.error(f"❌ SFTP Log Polling Error: {e}")
+            logger.error(f"❌ SFTP Chat Polling Error: {e}")
 
         await asyncio.sleep(3)
 
