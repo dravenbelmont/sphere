@@ -44,7 +44,8 @@ _sftp_port_val = os.getenv("SFTP_PORT", "22").strip().strip("[]()").strip()
 SFTP_PORT = int(_sftp_port_val) if _sftp_port_val.isdigit() else 22
 SFTP_USER = os.getenv("SFTP_USER", "").strip().strip("[]()").strip()
 SFTP_PASSWORD = os.getenv("SFTP_PASSWORD", ADMIN_PASSWORD).strip().strip("[]()").strip()
-PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/server-data/Pal/Binaries/Win64/PalDefender").strip()
+# Corrected path based on your server container logs
+PALDEFENDER_LOG_PATH = os.getenv("PALDEFENDER_LOG_PATH", "/palworld/Pal/Binaries/Win64/PalDefender").strip()
 
 # -------------------------------------------------------------
 # 3. Daily Login Pack & Shop Items
@@ -124,7 +125,7 @@ async def call_palworld_api(endpoint: str, method: str = "GET", payload: dict = 
         return None, str(e)
 
 # -------------------------------------------------------------
-# 7. Pal Defender SFTP Log Poller (Audited & Robust)
+# 7. Pal Defender SFTP Log Poller (Fixed File Rotation)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -134,7 +135,7 @@ async def poll_paldefender_logs_loop():
 
     logger.info(f"📂 Starting SFTP Pal Defender log watcher on {SFTP_HOST}:{SFTP_PORT} -> {PALDEFENDER_LOG_PATH}")
     last_file_name = None
-    last_file_size = -1
+    last_file_size = 0
 
     while not bot.is_closed():
         try:
@@ -146,25 +147,23 @@ async def poll_paldefender_logs_loop():
                 
                 try:
                     files = sftp.listdir_attr(PALDEFENDER_LOG_PATH)
-                    # Filter out directories, keep actual files
-                    log_files = [f for f in files if not stat.S_ISDIR(f.st_mode)] if 'stat' in globals() else [f for f in files]
-                    
-                    if not log_files:
+                    if not files:
                         sftp.close()
                         transport.close()
                         return []
 
                     # Sort by modification time to get the newest log file
-                    log_files.sort(key=lambda x: x.st_mtime, reverse=True)
-                    latest_file = log_files[0]
+                    files.sort(key=lambda x: x.st_mtime, reverse=True)
+                    latest_file = files[0]
                     current_file_path = f"{PALDEFENDER_LOG_PATH.rstrip('/')}/{latest_file.filename}"
 
                     new_lines = []
                     if last_file_name != latest_file.filename:
                         logger.info(f"🔄 New Pal Defender log file detected: {latest_file.filename}")
                         last_file_name = latest_file.filename
-                        last_file_size = latest_file.st_size
-                    elif latest_file.st_size > last_file_size:
+                        last_file_size = 0  # Reset size to 0 so we read the new log file from the beginning!
+                    
+                    if latest_file.st_size > last_file_size:
                         with sftp.open(current_file_path, 'r') as f:
                             f.seek(last_file_size)
                             content = f.read().decode('utf-8', errors='ignore')
