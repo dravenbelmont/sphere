@@ -185,7 +185,7 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
         await conn.close()
 
 # -------------------------------------------------------------
-# 8. SFTP Chat Poller & In-Game Command Listener
+# 8. SFTP Chat Poller & In-Game Command Listener (!daily)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -286,30 +286,25 @@ async def poll_paldefender_logs_loop():
                 for line in raw_lines:
                     line_str = line.strip()
                     if not line_str: continue
-                    line_lower = line_str.lower()
-                    if "chat" not in line_lower and "global" not in line_lower: continue
+                    
+                    # Forward to Discord chat channel if configured
+                    if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
+                        await channel.send(f"💬 `{line_str}`")
 
-                    player_name, message_text = None, None
-                    chat_match = re.search(r"\[Chat::[^\]]+\]\s*'([^']+)'", line_str, re.IGNORECASE)
-                    if chat_match:
-                        player_name = chat_match.group(1).strip()
-                        msg_match = re.search(r"\]:\s*(.*)$", line_str)
-                        if msg_match: message_text = msg_match.group(1).strip()
+                    # Flexible check for '!daily' command in chat logs
+                    if "!daily" in line_str.lower():
+                        player_name = None
+                        
+                        # Try to extract player name from quotes or brackets in log lines
+                        match_quotes = re.findall(r"['\"]([^'\"]+)['\"]", line_str)
+                        if match_quotes:
+                            player_name = match_quotes[0]
+                        else:
+                            parts = line_str.split(':')
+                            if len(parts) >= 2:
+                                player_name = parts[0].strip()
 
-                    if not player_name or not message_text:
-                        parts = line_str.split(':')
-                        if len(parts) >= 3:
-                            quote_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
-                            if quote_match:
-                                player_name = quote_match.group(1).strip()
-                                message_text = parts[-1].strip()
-
-                    if player_name and message_text:
-                        if channel:
-                            await channel.send(f"💬 **{player_name}**: {message_text}")
-
-                        # In-Game Chat Command Handler: !daily
-                        if message_text.lower().startswith("!daily"):
+                        if player_name:
                             target_pid = None
                             for pid, name in last_known_player_names.items():
                                 if name.lower() == player_name.lower():
@@ -327,23 +322,20 @@ async def poll_paldefender_logs_loop():
                             if target_pid:
                                 asyncio.create_task(process_chat_daily_reward(target_pid, player_name))
                             else:
-                                if REST_API_URL and ADMIN_PASSWORD:
-                                    await call_palworld_api("/announce", method="POST", payload={"message": f"@{player_name} You must be active on the server to claim daily rewards!"})
+                                # Fallback using player name directly as identifier if UID lookup fails
+                                asyncio.create_task(process_chat_daily_reward(player_name, player_name))
 
         except Exception as e:
             logger.error(f"❌ SFTP Polling Error (Reconnecting...): {e}")
             sftp = None
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(5)
 
 # -------------------------------------------------------------
 # 9. Automated Player Tracker Loop
 # -------------------------------------------------------------
-known_online_players = set()
-is_players_initialized = False
-
 async def poll_palworld_players_loop():
-    global known_online_players, last_known_player_names, is_players_initialized
+    global last_known_player_names
     await bot.wait_until_ready()
     
     while not bot.is_closed():
@@ -351,39 +343,11 @@ async def poll_palworld_players_loop():
             try:
                 data, error = await call_palworld_api("/players", method="GET")
                 if not error and data:
-                    players = data.get("players", [])
-                    current_players_map = {}
-                    
-                    for p in players:
+                    for p in data.get("players", []):
                         pid = p.get("playeruid") or p.get("userid") or p.get("name")
                         pname = p.get("name", "Unknown")
                         if pid:
-                            current_players_map[str(pid)] = pname
                             last_known_player_names[str(pid)] = pname
-
-                    current_ids = set(current_players_map.keys())
-                    channel = bot.get_channel(DISCORD_CHAT_CHANNEL_ID) if DISCORD_CHAT_CHANNEL_ID else None
-
-                    if not is_players_initialized:
-                        known_online_players = current_ids
-                        is_players_initialized = True
-                    else:
-                        joined_ids = current_ids - known_online_players
-                        left_ids = known_online_players - current_ids
-
-                        for jid in joined_ids:
-                            name = current_players_map.get(jid, "A player")
-                            if channel:
-                                embed = discord.Embed(title="🟢 Player Joined", description=f"**{name}** has joined the server!", color=discord.Color.green())
-                                await channel.send(embed=embed)
-
-                        for lid in left_ids:
-                            name = last_known_player_names.get(lid, "A player")
-                            if channel:
-                                embed = discord.Embed(title="🔴 Player Left", description=f"**{name}** has left the server.", color=discord.Color.red())
-                                await channel.send(embed=embed)
-
-                        known_online_players = current_ids
             except Exception as e:
                 logger.error(f"Player polling loop error: {e}")
                 
@@ -411,7 +375,7 @@ async def on_message(message):
             if REST_API_URL and ADMIN_PASSWORD:
                 try:
                     clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
-                    chat_text = f"[{message.author.display_name}] {clean_msg}"
+                    chat_text = f"[Discord: {message.author.display_name}] {clean_msg}"
                     await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
                 except Exception:
                     pass
