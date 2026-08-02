@@ -228,7 +228,27 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
         await conn.close()
 
 # -------------------------------------------------------------
-# 8. SFTP Chat Poller & In-Game Command Listener (!daily)
+# 8. Strict Chat Sanitizer (Guaranteed No IP Leakage)
+# -------------------------------------------------------------
+def parse_and_clean_chat(line_str: str):
+    """Strips all server metadata, timestamps, UserIDs, and IP addresses, returning only name and message."""
+    try:
+        # Extract player name from single quotes (e.g., ['Draven'])
+        name_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
+        player_name = name_match.group(1) if name_match else "Player"
+        
+        # Extract the message content after the last ']: ' delimiter
+        if "]: " in line_str:
+            message = line_str.split("]: ")[-1].strip()
+        else:
+            message = line_str
+            
+        return player_name, message
+    except Exception:
+        return "Player", line_str
+
+# -------------------------------------------------------------
+# 9. SFTP Chat Poller & In-Game Command Listener (!daily)
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -330,20 +350,15 @@ async def poll_paldefender_logs_loop():
                     line_str = line.strip()
                     if not line_str: continue
                     
+                    # Relay to Discord channel cleanly (NO raw logs, NO IPs, NO metadata)
                     if channel and ("chat" in line_str.lower() or "global" in line_str.lower()):
-                        await channel.send(f"💬 `{line_str}`")
+                        p_name, p_msg = parse_and_clean_chat(line_str)
+                        if p_msg:
+                            await channel.send(f"💬 **{p_name}**: {p_msg}")
 
                     # Check for exact standalone !daily command in chat logs
                     if re.search(r'\b!daily\b', line_str.lower()):
-                        player_name = None
-                        match_quotes = re.findall(r"['\"]([^'\"]+)['\"]", line_str)
-                        if match_quotes:
-                            player_name = match_quotes[0]
-                        else:
-                            parts = line_str.split(':')
-                            if len(parts) >= 2:
-                                player_name = parts[0].strip()
-
+                        player_name, _ = parse_and_clean_chat(line_str)
                         if player_name:
                             target_pid = None
                             for pid, name in last_known_player_names.items():
@@ -371,7 +386,7 @@ async def poll_paldefender_logs_loop():
         await asyncio.sleep(5)
 
 # -------------------------------------------------------------
-# 9. Automated Player Tracker Loop
+# 10. Automated Player Tracker Loop
 # -------------------------------------------------------------
 async def poll_palworld_players_loop():
     global last_known_player_names
@@ -393,7 +408,7 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(25)
 
 # -------------------------------------------------------------
-# 10. Discord Bot Events & Commands
+# 11. Discord Bot Events & Commands
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
@@ -444,7 +459,7 @@ async def resetdaily(ctx):
         await conn.close()
 
 # -------------------------------------------------------------
-# 11. Web Server & Main Execution
+# 12. Web Server & Main Execution
 # -------------------------------------------------------------
 async def main():
     app = web.Application()
