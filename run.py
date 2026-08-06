@@ -530,9 +530,15 @@ async def on_message(message):
                 try:
                     clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
                     chat_text = f"[Discord: {message.author.display_name}] {clean_msg}"
-                    await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
-                except Exception:
-                    pass
+                    res, err = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
+                    if err:
+                        logger.error(f"❌ REST API Announce Failed: {err}")
+                    else:
+                        logger.info(f"📡 Sent to In-Game: {chat_text}")
+                except Exception as e:
+                    logger.error(f"❌ Broadcast Exception: {e}")
+            else:
+                logger.warning("⚠️ Skipping broadcast: REST_API_URL or ADMIN_PASSWORD missing.")
 
 @bot.command(name="shop")
 async def shop(ctx, category: str = None):
