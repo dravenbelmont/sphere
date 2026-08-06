@@ -101,7 +101,6 @@ DAILY_ITEMS = [
 ]
 
 SHOP_ITEMS = {
-    # Spheres
     "pal_sphere": {"name": "Pal Sphere", "id": "PalSphere", "price": 10, "category": "Spheres"},
     "mega_sphere": {"name": "Mega Sphere", "id": "MegaSphere", "price": 25, "category": "Spheres"},
     "giga_sphere": {"name": "Giga Sphere", "id": "GigaSphere", "price": 50, "category": "Spheres"},
@@ -109,21 +108,15 @@ SHOP_ITEMS = {
     "ultimate_sphere": {"name": "Ultimate Sphere", "id": "UltimateSphere", "price": 250, "category": "Spheres"},
     "legend_sphere": {"name": "Legend Sphere", "id": "LegendSphere", "price": 500, "category": "Spheres"},
     "plasteel_sphere": {"name": "Plasteel Sphere", "id": "PlasteelSphere", "price": 800, "category": "Spheres"},
-
-    # Shields
     "common_shield": {"name": "Common Shield", "id": "Armor_Shield_01", "price": 100, "category": "Shields"},
     "mega_shield": {"name": "Mega Shield", "id": "Armor_Shield_02", "price": 300, "category": "Shields"},
     "giga_shield": {"name": "Giga Shield", "id": "Armor_Shield_03", "price": 600, "category": "Shields"},
     "hyper_shield": {"name": "Hyper Shield", "id": "Armor_Shield_04", "price": 1200, "category": "Shields"},
     "ultra_shield": {"name": "Ultra Shield", "id": "Armor_Shield_05", "price": 2500, "category": "Shields"},
-
-    # Armors
     "metal_armor": {"name": "Metal Armor", "id": "MetalArmor", "price": 400, "category": "Armors"},
     "refined_metal_armor": {"name": "Refined Metal Armor", "id": "RefinedMetalArmor", "price": 1000, "category": "Armors"},
     "pal_metal_armor": {"name": "Pal Metal Armor", "id": "PalMetalArmor", "price": 2500, "category": "Armors"},
     "plasteel_armor": {"name": "Plasteel Armor", "id": "PlasteelArmor", "price": 5000, "category": "Armors"},
-
-    # Guns
     "musket": {"name": "Musket", "id": "Musket", "price": 200, "category": "Guns"},
     "handgun": {"name": "Made-in-Japan Handgun", "id": "Handgun", "price": 500, "category": "Guns"},
     "double_barrel": {"name": "Double-barreled Shotgun", "id": "DoubleBarrelShotgun", "price": 800, "category": "Guns"},
@@ -132,29 +125,21 @@ SHOP_ITEMS = {
     "rocket_launcher": {"name": "Rocket Launcher", "id": "RocketLauncher", "price": 6000, "category": "Guns"},
     "laser_rifle": {"name": "Laser Rifle", "id": "LaserRifle", "price": 7500, "category": "Guns"},
     "gatling_gun": {"name": "Gatling Gun", "id": "GatlingGun", "price": 10000, "category": "Guns"},
-
-    # Ammo
     "normal_bullet": {"name": "Normal Bullet (x100)", "id": "Bullet_Normal", "price": 150, "category": "Ammo"},
     "assault_bullet": {"name": "Assault Rifle Bullet (x100)", "id": "Bullet_AssaultRifle", "price": 300, "category": "Ammo"},
     "shotgun_shell": {"name": "Shotgun Shell (x50)", "id": "Bullet_Shotgun", "price": 250, "category": "Ammo"},
     "rocket_ammo": {"name": "Rocket Ammo (x10)", "id": "RocketValue", "price": 500, "category": "Ammo"},
-
-    # Accessories
     "attack_ring": {"name": "Ring of Attack +2", "id": "RingOfAttack_02", "price": 3000, "category": "Accessories"},
     "defense_ring": {"name": "Ring of Defense +2", "id": "RingOfDefense_02", "price": 3000, "category": "Accessories"},
     "hp_ring": {"name": "Life Ring +2", "id": "RingOfHP_02", "price": 3000, "category": "Accessories"},
     "heat_undershirt": {"name": "Heat-Resistant Undershirt +2", "id": "HeatResistantUndershirt_02", "price": 2000, "category": "Accessories"},
     "cold_undershirt": {"name": "Cold-Resistant Undershirt +2", "id": "ColdResistantUndershirt_02", "price": 2000, "category": "Accessories"},
-
-    # Saddles
     "direhowl_saddle": {"name": "Direhowl Saddle", "id": "DirehowlSaddle", "price": 500, "category": "Saddles"},
     "galeclaw_saddle": {"name": "Galeclaw Saddle", "id": "GaleclawSaddle", "price": 600, "category": "Saddles"},
     "faleris_saddle": {"name": "Faleris Saddle", "id": "FalerisSaddle", "price": 2000, "category": "Saddles"},
     "shadowbeak_saddle": {"name": "Shadowbeak Saddle", "id": "ShadowbeakSaddle", "price": 4000, "category": "Saddles"},
     "frostallion_saddle": {"name": "Frostallion Saddle", "id": "FrostallionSaddle", "price": 5000, "category": "Saddles"},
     "jetragon_saddle": {"name": "Jetragon Saddle", "id": "JetragonSaddle", "price": 6000, "category": "Saddles"},
-
-    # Food & Consumables
     "cake": {"name": "Cake", "id": "Cake", "price": 250, "category": "Food & Consumables"}
 }
 
@@ -320,7 +305,6 @@ async def process_chat_daily_reward(player_uid: str, player_name: str):
 # -------------------------------------------------------------
 def parse_and_clean_chat(line_str: str):
     try:
-        # Extract quoted player name if present
         name_match = re.search(r"['\"]([^'\"]+)['\"]", line_str)
         if name_match:
             player_name = name_match.group(1)
@@ -330,17 +314,13 @@ def parse_and_clean_chat(line_str: str):
             else:
                 player_name = "Player"
 
-        # Strip any IPv4 address (e.g. 192.168.1.1 or 127.0.0.1:25575)
         player_name = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b', '', player_name)
-        
-        # Strip brackets, parentheses, and extra whitespace
         player_name = re.sub(r'[\(\)\[\]<>]', '', player_name)
         player_name = re.sub(r'\s+', ' ', player_name).strip()
         
         if not player_name or player_name.lower() in ("chat", "global", "info"):
             player_name = "Player"
 
-        # Extract message text
         if "]: " in line_str:
             message = line_str.split("]: ")[-1].strip()
         elif ": " in line_str:
@@ -353,7 +333,7 @@ def parse_and_clean_chat(line_str: str):
         return "Player", line_str
 
 # -------------------------------------------------------------
-# 9. SFTP Chat Poller Loop (Single-Discovery & Lock-In)
+# 9. SFTP Chat Poller Loop
 # -------------------------------------------------------------
 async def poll_paldefender_logs_loop():
     await bot.wait_until_ready()
@@ -389,7 +369,6 @@ async def poll_paldefender_logs_loop():
     def discover_and_lock_log():
         nonlocal locked_log_path, last_file_size
         
-        # 1. Check direct file path targets
         for candidate in POSSIBLE_LOG_PATHS:
             if not candidate: continue
             try:
@@ -400,7 +379,6 @@ async def poll_paldefender_logs_loop():
             except Exception:
                 continue
 
-        # 2. Check directory listing if explicit paths failed
         for log_dir in POSSIBLE_LOG_DIRS:
             try:
                 files = sftp.listdir(log_dir)
@@ -418,12 +396,11 @@ async def poll_paldefender_logs_loop():
         try:
             if sftp is None or transport is None or not transport.is_active():
                 transport, sftp = await asyncio.to_thread(connect_sftp)
-                locked_log_path = None # Reset lock on new SFTP session
+                locked_log_path = None
 
             def read_locked_file():
                 nonlocal locked_log_path, last_file_size
                 
-                # Perform discovery ONCE if not currently locked onto a file
                 if not locked_log_path:
                     discover_and_lock_log()
                     if not locked_log_path:
@@ -439,7 +416,6 @@ async def poll_paldefender_logs_loop():
 
                 size = stat_info.st_size
                 if size < last_file_size:
-                    # Log file truncated/reset on 24h server restart
                     last_file_size = 0
 
                 new_lines = []
@@ -508,12 +484,16 @@ async def poll_palworld_players_loop():
         await asyncio.sleep(30)
 
 # -------------------------------------------------------------
-# 11. Discord Commands
+# 11. Discord Commands & Event Handlers
 # -------------------------------------------------------------
 @bot.event
 async def on_ready():
     await init_db()
     logger.info(f"✅ Sphere Bot ready as {bot.user}")
+    logger.info(f"⚙️ Configured REST_API_URL: '{REST_API_URL}'")
+    logger.info(f"⚙️ Configured ADMIN_PASSWORD: {'SET' if ADMIN_PASSWORD else 'MISSING'}")
+    logger.info(f"⚙️ Configured DISCORD_CHAT_CHANNEL_ID: {DISCORD_CHAT_CHANNEL_ID}")
+    
     if not getattr(bot, "tasks_started", False):
         bot.tasks_started = True
         bot.loop.create_task(poll_palworld_players_loop())
@@ -522,23 +502,32 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     await bot.process_commands(message)
-    if message.author.bot: return
+    if message.author.bot: 
+        return
     
-    if DISCORD_CHAT_CHANNEL_ID != 0 and message.channel.id == DISCORD_CHAT_CHANNEL_ID:
-        if not message.content.startswith(BOT_PREFIX):
-            if REST_API_URL and ADMIN_PASSWORD:
-                try:
-                    clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
-                    chat_text = f"[Discord: {message.author.display_name}] {clean_msg}"
-                    res, err = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
-                    if err:
-                        logger.error(f"❌ REST API Announce Failed: {err}")
-                    else:
-                        logger.info(f"📡 Sent to In-Game: {chat_text}")
-                except Exception as e:
-                    logger.error(f"❌ Broadcast Exception: {e}")
-            else:
-                logger.warning("⚠️ Skipping broadcast: REST_API_URL or ADMIN_PASSWORD missing.")
+    # Debug log to track every incoming Discord message seen by the bot
+    if DISCORD_CHAT_CHANNEL_ID != 0:
+        if message.channel.id == DISCORD_CHAT_CHANNEL_ID:
+            logger.info(f"📩 Message received in chat channel from {message.author.display_name}: {message.content}")
+            if not message.content.startswith(BOT_PREFIX):
+                if REST_API_URL and ADMIN_PASSWORD:
+                    try:
+                        clean_msg = message.clean_content.replace('"', '').replace('\n', ' ')
+                        chat_text = f"[Discord: {message.author.display_name}] {clean_msg}"
+                        res, err = await call_palworld_api("/announce", method="POST", payload={"message": chat_text})
+                        if err:
+                            logger.error(f"❌ REST API Announce Failed: {err}")
+                        else:
+                            logger.info(f"📡 Sent to In-Game: {chat_text}")
+                    except Exception as e:
+                        logger.error(f"❌ Broadcast Exception: {e}")
+                else:
+                    logger.warning("⚠️ Skipping broadcast: REST_API_URL or ADMIN_PASSWORD missing.")
+        else:
+            # Channel ID mismatch
+            pass
+    else:
+        logger.warning("⚠️ DISCORD_CHAT_CHANNEL_ID is currently set to 0. Cannot route messages to game.")
 
 @bot.command(name="shop")
 async def shop(ctx, category: str = None):
