@@ -1,0 +1,21 @@
+# ==========================================
+# Sphere Bot Configuration File
+# ==========================================
+
+sftp:
+  host: "15.235.53.213"
+  port: 22
+  username: "zW9ClkhLUC5b"
+  password: "rzZ1L2wJsYfX"
+
+rcon:
+  enabled: true
+  host: "15.235.53.213"
+  port: 25575
+  password: "Nuketime!"
+
+chat:
+  enabled: true
+  channel_id: 1532017251639889960
+  log_directory: "/server-data/Pal/Binaries/Win64/PalDefender/Logs"
+  poll_interval: 2.0
