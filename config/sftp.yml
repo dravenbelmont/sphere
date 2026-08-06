@@ -5,17 +5,17 @@
 sftp:
   host: "15.235.53.213"
   port: 22
-  username: "YOUR_SFTP_USERNAME"
-  password: "YOUR_SFTP_PASSWORD"
+  username: "zW9ClkhLUC5b"
+  password: "rzZ1L2wJsYfX"
 
 rcon:
   enabled: true
   host: "15.235.53.213"
-  port: YOUR_RCON_PORT
-  password: "YOUR_RCON_ADMIN_PASSWORD"
+  port: 25575
+  password: "Nuketime!"
 
 chat:
   enabled: true
-  channel_id: YOUR_DISCORD_CHANNEL_ID
-  log_directory: "Pal/Binaries/Win64/PalDefender/Logs"
+  channel_id: 1532017251639889960
+  log_directory: "/server-data/Pal/Binaries/Win64/PalDefender/Logs"
   poll_interval: 2.0
